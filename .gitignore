@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Swift
+.build/
+*.xcodeproj
+Package.resolved
+
+# Cache
+*.swiftpm
+DerivedData/
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Claude Code
+.claude/settings.local.json

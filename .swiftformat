@@ -1,0 +1,11 @@
+# SwiftFormat configuration
+
+# Indentation
+--indent 4
+--indentcase false
+--ifdef no-indent
+--xcodeindentation enabled
+
+# Line breaks
+--linebreaks lf
+--maxwidth 120

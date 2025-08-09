@@ -1,0 +1,8 @@
+# Ignore generated test project (will be created by create_test_project.swift)
+TestData/TestProject.xcodeproj/
+TestData/TestProject.xcodeproj.backup/
+
+# But keep the test source files
+!TestData/Sources/
+!TestData/Resources/
+!TestData/Tests/
