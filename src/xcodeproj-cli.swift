@@ -519,32 +519,67 @@ class XcodeProjUtility {
       throw ProjectError.operationFailed("File not found: \(filePath)")
     }
 
+    var buildFilesToDelete: Set<PBXBuildFile> = []
+
+    // Collect all build files that reference this file
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
+          if let files = sourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          if let files = resourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
+          if let files = frameworksBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          if let files = copyFilesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+      }
+    }
+
     // Remove from all groups
     for group in pbxproj.groups {
       group.children.removeAll { $0 === fileRef }
     }
 
-    // Remove from all build phases
+    // Remove build files from all build phases
     for target in pbxproj.nativeTargets {
       for buildPhase in target.buildPhases {
         if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-          sourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          resourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-          frameworksBuildPhase.files?.removeAll { $0.file === fileRef }
+          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          copyFilesBuildPhase.files?.removeAll { $0.file === fileRef }
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
       }
     }
 
-    // Remove build files that reference this file
-    let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === fileRef }
-    for buildFile in buildFilesToRemove {
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
       pbxproj.delete(object: buildFile)
     }
 
@@ -555,19 +590,67 @@ class XcodeProjUtility {
   }
 
   func removeGroup(_ groupPath: String) throws {
-    // Find the group to remove
-    guard let group = findGroup(named: groupPath, in: pbxproj.groups) else {
-      throw ProjectError.groupNotFound(groupPath)
+    // First try to find it as a regular group
+    if let group = findGroup(named: groupPath, in: pbxproj.groups) {
+      // Check if this is a special system group that shouldn't be removed
+      if group === pbxproj.rootObject?.productsGroup {
+        throw ProjectError.operationFailed("Cannot remove Products group - it's a system group")
+      }
+      if group === pbxproj.rootObject?.mainGroup {
+        throw ProjectError.operationFailed(
+          "Cannot remove '\(groupPath)' - it is the main project group. This would corrupt the project structure."
+        )
+      }
+
+      removeGroupHierarchy(group)
+      print("✅ Removed group '\(groupPath)'")
+      return
     }
 
+    // Try to find it as a file reference (folder reference)
+    if let folderRef = pbxproj.fileReferences.first(where: {
+      ($0.path == groupPath || $0.name == groupPath)
+        && ($0.lastKnownFileType == "folder" || $0.lastKnownFileType == "folder.assetcatalog")
+    }) {
+      removeFolderReference(folderRef)
+      print("✅ Removed folder reference '\(groupPath)'")
+      return
+    }
+
+    // Try to find it as a synchronized folder
+    if let syncGroup = pbxproj.fileSystemSynchronizedRootGroups.first(where: {
+      $0.path == groupPath || $0.name == groupPath
+    }) {
+      removeSynchronizedFolder(syncGroup)
+      print("✅ Removed synchronized folder '\(groupPath)'")
+      return
+    }
+
+    throw ProjectError.groupNotFound(groupPath)
+  }
+
+  private func removeGroupHierarchy(_ group: PBXGroup) {
     // Recursively collect all file references in this group and subgroups
     var filesToRemove: [PBXFileReference] = []
     var groupsToRemove: [PBXGroup] = [group]
+    var variantGroupsToRemove: [PBXVariantGroup] = []
+    var allChildrenToRemove: [PBXFileElement] = []
+    var buildFilesToDelete: Set<PBXBuildFile> = []
 
     func collectFilesAndGroups(from group: PBXGroup) {
       for child in group.children {
+        allChildrenToRemove.append(child)
+
         if let fileRef = child as? PBXFileReference {
           filesToRemove.append(fileRef)
+        } else if let variantGroup = child as? PBXVariantGroup {
+          variantGroupsToRemove.append(variantGroup)
+          // Collect files from variant group
+          for variantChild in variantGroup.children {
+            if let variantFileRef = variantChild as? PBXFileReference {
+              filesToRemove.append(variantFileRef)
+            }
+          }
         } else if let subgroup = child as? PBXGroup {
           groupsToRemove.append(subgroup)
           collectFilesAndGroups(from: subgroup)
@@ -577,87 +660,171 @@ class XcodeProjUtility {
 
     collectFilesAndGroups(from: group)
 
-    // Remove all files from build phases
+    // First, collect all build files that need to be removed
     for fileRef in filesToRemove {
-      // Remove from all build phases
+      // Collect build files from all build phases
       for target in pbxproj.nativeTargets {
         for buildPhase in target.buildPhases {
           if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-            sourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = sourcesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            resourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = resourcesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-            frameworksBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = frameworksBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            copyFilesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = copyFilesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
         }
       }
+    }
 
-      // Remove build files that reference this file
-      let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === fileRef }
-      for buildFile in buildFilesToRemove {
-        pbxproj.delete(object: buildFile)
+    // Remove build files from their respective build phases
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
+          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
+          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
       }
+    }
 
-      // Remove file reference from project
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
+      pbxproj.delete(object: buildFile)
+    }
+
+    // Remove file references from project
+    for fileRef in filesToRemove {
       pbxproj.delete(object: fileRef)
     }
 
-    // Remove the group from its parent
+    // Remove variant groups from project
+    for variantGroup in variantGroupsToRemove {
+      pbxproj.delete(object: variantGroup)
+    }
+
+    // Remove the group from its parent (including main project group)
     for parentGroup in pbxproj.groups {
       parentGroup.children.removeAll { $0 === group }
+    }
+
+    // Also check if the group is in the main project's mainGroup
+    if let mainGroup = pbxproj.rootObject?.mainGroup {
+      mainGroup.children.removeAll { $0 === group }
     }
 
     // Remove all groups from project
     for groupToRemove in groupsToRemove {
       pbxproj.delete(object: groupToRemove)
     }
-
-    print("✅ Removed group '\(groupPath)' and \(filesToRemove.count) file(s)")
   }
 
-  func removeFolder(_ folderPath: String) throws {
-    // This function removes a folder reference (filesystem-synced folder)
-    // First try to find it as a file reference with folder type
-    if let folderRef = pbxproj.fileReferences.first(where: {
-      ($0.path == folderPath || $0.name == folderPath)
-        && ($0.lastKnownFileType == "folder" || $0.lastKnownFileType == "folder.assetcatalog")
-    }) {
-      // Remove from all groups
-      for group in pbxproj.groups {
-        group.children.removeAll { $0 === folderRef }
-      }
+  private func removeFolderReference(_ folderRef: PBXFileReference) {
+    var buildFilesToDelete: Set<PBXBuildFile> = []
 
-      // Remove from resource build phases (folders are typically in resources)
-      for target in pbxproj.nativeTargets {
-        for buildPhase in target.buildPhases {
-          if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            resourcesBuildPhase.files?.removeAll { $0.file === folderRef }
+    // Collect all build files that reference this folder
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          if let files = resourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === folderRef {
+              buildFilesToDelete.insert(buildFile)
+            }
           }
-          if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            copyFilesBuildPhase.files?.removeAll { $0.file === folderRef }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          if let files = copyFilesBuildPhase.files {
+            for buildFile in files where buildFile.file === folderRef {
+              buildFilesToDelete.insert(buildFile)
+            }
           }
         }
       }
-
-      // Remove build files
-      let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === folderRef }
-      for buildFile in buildFilesToRemove {
-        pbxproj.delete(object: buildFile)
-      }
-
-      // Remove from project
-      pbxproj.delete(object: folderRef)
-
-      print("✅ Removed folder reference '\(folderPath)'")
-    } else {
-      // If not found as folder reference, try as group
-      try removeGroup(folderPath)
     }
+
+    // Remove from all groups
+    for group in pbxproj.groups {
+      group.children.removeAll { $0 === folderRef }
+    }
+
+    // Remove build files from resource build phases
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+      }
+    }
+
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
+      pbxproj.delete(object: buildFile)
+    }
+
+    // Remove the folder reference from project
+    pbxproj.delete(object: folderRef)
+  }
+
+  private func removeSynchronizedFolder(_ syncGroup: PBXFileSystemSynchronizedRootGroup) {
+    // Remove from parent groups
+    for group in pbxproj.groups {
+      group.children.removeAll { $0 === syncGroup }
+    }
+
+    // Remove from build phases if needed
+    for target in pbxproj.nativeTargets {
+      // Remove from build phase membership exceptions if present
+      target.buildPhases.forEach { phase in
+        if let sourcePhase = phase as? PBXSourcesBuildPhase {
+          sourcePhase.files?.removeAll { file in
+            // Check if this build file is related to the sync group
+            if let fileRef = file.file as? PBXFileSystemSynchronizedRootGroup {
+              return fileRef === syncGroup
+            }
+            return false
+          }
+        }
+      }
+    }
+
+    // Remove the synchronized group from project
+    pbxproj.delete(object: syncGroup)
+  }
+
+  func removeFolder(_ folderPath: String) throws {
+    // Deprecated: This function now just calls removeGroup for consistency
+    // Kept for backward compatibility
+    try removeGroup(folderPath)
   }
 
   // Add synchronized folder reference (Xcode 16+ filesystem synchronized group)
@@ -1251,6 +1418,672 @@ class XcodeProjUtility {
     }
   }
 
+  // Enhanced list-build-settings command - Xcode-style output
+  func listBuildSettings(
+    targetName: String? = nil, configuration: String? = nil, showInherited: Bool = false,
+    outputJSON: Bool = false, showAll: Bool = false
+  ) {
+    if outputJSON {
+      listBuildSettingsJSON(
+        targetName: targetName, configuration: configuration,
+        showInherited: showInherited, showAll: showAll
+      )
+      return
+    }
+
+    if showAll {
+      listAllBuildSettings(configuration: configuration, showInherited: showInherited)
+      return
+    }
+    if let targetName = targetName {
+      // Target-level build settings with project inheritance info
+      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
+        let targetConfigList = target.buildConfigurationList
+      else {
+        print("⚠️  Target '\(targetName)' not found")
+        print("Available targets: \(pbxproj.nativeTargets.map { $0.name }.joined(separator: ", "))")
+        exit(1)
+      }
+
+      print("🎯 Build Settings for Target: \(targetName)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      // Get all configurations
+      let configs = targetConfigList.buildConfigurations
+      let configNames = configs.map { $0.name }
+
+      // Get project-level settings for comparison
+      let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+      // Collect all unique setting keys across all configurations
+      var allSettingKeys = Set<String>()
+      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+      var projectSettingsData: [String: [String: Any]] = [:]  // For inheritance tracking
+
+      for config in configs {
+        if let filterConfig = configuration, config.name != filterConfig {
+          continue
+        }
+
+        settingsData[config.name] = config.buildSettings
+        allSettingKeys.formUnion(config.buildSettings.keys)
+
+        // Get project settings for this config
+        if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+          $0.name == config.name
+        }) {
+          projectSettingsData[config.name] = projectConfig.buildSettings
+          if showInherited {
+            allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+          }
+        }
+      }
+
+      // Filter configs if specific configuration requested
+      let activeConfigs: [String]
+      if let config = configuration {
+        activeConfigs = [config]
+      } else {
+        activeConfigs = configNames
+      }
+
+      if allSettingKeys.isEmpty && !showInherited {
+        print("  (No explicit settings defined at target level)")
+        return
+      }
+
+      // Sort settings alphabetically
+      let sortedKeys = allSettingKeys.sorted()
+
+      // Display each setting with its values across configurations
+      for key in sortedKeys {
+        let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
+          key: key,
+          activeConfigs: activeConfigs,
+          settingsData: settingsData,
+          projectSettingsData: projectSettingsData,
+          showInherited: showInherited
+        )
+
+        if !hasTargetSetting && !showInherited {
+          continue  // Skip inherited-only settings if not showing inherited
+        }
+
+        displaySettingValues(
+          key: key,
+          values: values,
+          inheritedValues: inheritedValues,
+          isInheritedOnly: isInheritedOnly,
+          activeConfigs: activeConfigs,
+          settingsData: settingsData,
+          showInherited: showInherited
+        )
+      }
+
+      print("")
+    } else {
+      // Project-level build settings
+      guard let configList = pbxproj.rootObject?.buildConfigurationList else {
+        print("⚠️  No project build configuration found")
+        exit(1)
+      }
+
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print("🏗️  Build Settings for Project: \(projectName)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      // Get all configurations
+      let configs = configList.buildConfigurations
+      let configNames = configs.map { $0.name }
+
+      // Collect all unique setting keys across all configurations
+      var allSettingKeys = Set<String>()
+      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+
+      for config in configs {
+        if let filterConfig = configuration, config.name != filterConfig {
+          continue
+        }
+
+        settingsData[config.name] = config.buildSettings
+        allSettingKeys.formUnion(config.buildSettings.keys)
+      }
+
+      // Filter configs if specific configuration requested
+      let activeConfigs: [String]
+      if let config = configuration {
+        activeConfigs = [config]
+      } else {
+        activeConfigs = configNames
+      }
+
+      if allSettingKeys.isEmpty {
+        print("  (No explicit settings defined)")
+        return
+      }
+
+      // Sort settings alphabetically
+      let sortedKeys = allSettingKeys.sorted()
+
+      // Display each setting with its values across configurations
+      for key in sortedKeys {
+        var values: [String: String] = [:]  // [ConfigName: FormattedValue]
+
+        for configName in activeConfigs {
+          if let value = settingsData[configName]?[key] {
+            values[configName] = formatBuildSettingValue(value)
+          }
+        }
+
+        // Check if all configs have the same value
+        let uniqueValues = Set(values.values)
+
+        if uniqueValues.count == 1, let singleValue = values.values.first {
+          // Same value across all configurations - display inline
+          print("  \(key): \(singleValue)")
+        } else {
+          // Different values per configuration - show on separate lines
+          print("  \(key)")
+          for configName in activeConfigs.sorted() {
+            if let value = values[configName] {
+              print("    \(configName): \(value)")
+            }
+          }
+        }
+      }
+
+      print("")
+    }
+  }
+
+  private func formatBuildSettingValue(_ value: Any) -> String {
+    if let stringValue = value as? String {
+      return stringValue
+    } else if let arrayValue = value as? [String] {
+      return arrayValue.joined(separator: ", ")
+    } else {
+      return "\(value)"
+    }
+  }
+
+  // Common helper to display a setting with its values across configurations
+  private func displaySettingValues(
+    key: String,
+    values: [String: String],
+    inheritedValues: [String: String],
+    isInheritedOnly: Bool,
+    activeConfigs: [String],
+    settingsData: [String: [String: Any]],
+    showInherited: Bool
+  ) {
+    // Check if all configs have the same value
+    let uniqueValues = Set(values.values)
+
+    if uniqueValues.count == 1, let singleValue = values.values.first {
+      // Same value across all configurations - display inline
+      if isInheritedOnly {
+        print("  \(key): \(singleValue) [inherited from project]")
+      } else {
+        print("  \(key): \(singleValue)")
+        // Show if it overrides a project setting
+        let uniqueInheritedValues = Set(inheritedValues.values)
+        if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
+          projectValue != singleValue
+        {
+          print("    ↳ overrides project: \(projectValue)")
+        }
+      }
+    } else {
+      // Different values per configuration - show on separate lines
+      print("  \(key)")
+      for configName in activeConfigs.sorted() {
+        if let value = values[configName] {
+          let isInherited = settingsData[configName]?[key] == nil && showInherited
+          let inheritedSuffix = isInherited ? " [inherited]" : ""
+          print("    \(configName): \(value)\(inheritedSuffix)")
+
+          // Show override info if applicable
+          if !isInherited, let projectValue = inheritedValues[configName], projectValue != value {
+            print("      ↳ overrides project: \(projectValue)")
+          }
+        }
+      }
+    }
+  }
+
+  // Helper to collect setting values across configurations
+  private func collectSettingValues(
+    key: String,
+    activeConfigs: [String],
+    settingsData: [String: [String: Any]],
+    projectSettingsData: [String: [String: Any]],
+    showInherited: Bool
+  ) -> (
+    values: [String: String], inheritedValues: [String: String], hasTargetSetting: Bool,
+    isInheritedOnly: Bool
+  ) {
+    var hasTargetSetting = false
+    var isInheritedOnly = true
+    var values: [String: String] = [:]
+    var inheritedValues: [String: String] = [:]
+
+    for configName in activeConfigs {
+      if let targetValue = settingsData[configName]?[key] {
+        hasTargetSetting = true
+        isInheritedOnly = false
+        values[configName] = formatBuildSettingValue(targetValue)
+      } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+        values[configName] = formatBuildSettingValue(projectValue)
+        inheritedValues[configName] = formatBuildSettingValue(projectValue)
+      }
+
+      // Track project values for override detection
+      if let projectValue = projectSettingsData[configName]?[key] {
+        let projectValueStr = formatBuildSettingValue(projectValue)
+        if inheritedValues[configName] == nil && values[configName] != projectValueStr {
+          inheritedValues[configName] = projectValueStr
+        }
+      }
+    }
+
+    return (values, inheritedValues, hasTargetSetting, isInheritedOnly)
+  }
+
+  // JSON output for list-build-settings
+  private func listBuildSettingsJSON(
+    targetName: String? = nil, configuration: String? = nil,
+    showInherited: Bool = false, showAll: Bool = false
+  ) {
+    var result: [String: Any] = [:]
+
+    if showAll {
+      // Include project and all targets
+      var allSettings: [String: Any] = [:]
+
+      // Project settings
+      if let configList = pbxproj.rootObject?.buildConfigurationList {
+        allSettings["project"] = collectBuildSettingsData(
+          configList: configList,
+          configuration: configuration
+        )
+      }
+
+      // All targets
+      var targetsSettings: [String: Any] = [:]
+      for target in pbxproj.nativeTargets {
+        if let configList = target.buildConfigurationList {
+          let targetData = collectTargetBuildSettingsData(
+            target: target,
+            configuration: configuration,
+            showInherited: showInherited
+          )
+          targetsSettings[target.name] = targetData
+        }
+      }
+      allSettings["targets"] = targetsSettings
+      result = allSettings
+
+    } else if let targetName = targetName {
+      // Specific target
+      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+        let errorDict =
+          [
+            "error": "Target '\(targetName)' not found",
+            "availableTargets": pbxproj.nativeTargets.map { $0.name },
+          ] as [String: Any]
+        if let jsonData = try? JSONSerialization.data(
+          withJSONObject: errorDict, options: .prettyPrinted),
+          let jsonString = String(data: jsonData, encoding: .utf8)
+        {
+          print(jsonString)
+        } else {
+          print("{\"error\": \"Target '\(targetName)' not found\"}")
+        }
+        exit(1)
+      }
+
+      result = collectTargetBuildSettingsData(
+        target: target,
+        configuration: configuration,
+        showInherited: showInherited
+      )
+
+    } else {
+      // Project only
+      if let configList = pbxproj.rootObject?.buildConfigurationList {
+        result = collectBuildSettingsData(
+          configList: configList,
+          configuration: configuration
+        )
+      }
+    }
+
+    // Output JSON
+    if let jsonData = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted),
+      let jsonString = String(data: jsonData, encoding: .utf8)
+    {
+      print(jsonString)
+    } else {
+      print("{}")
+    }
+  }
+
+  // Helper to collect build settings data for JSON output (setting-centric)
+  private func collectBuildSettingsData(
+    configList: XCConfigurationList, configuration: String? = nil
+  ) -> [String: Any] {
+    var result: [String: Any] = [:]
+
+    // Collect all settings across configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+
+    for config in configList.buildConfigurations {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+    }
+
+    // Build setting-centric structure
+    for key in allSettingKeys {
+      var values: [String: Any] = [:]
+
+      for (configName, configSettings) in settingsData {
+        if let value = configSettings[key] {
+          values[configName] = formatBuildSettingValueForJSON(value)
+        }
+      }
+
+      // If all configs have the same value, simplify to just the value
+      let uniqueValues = Set(values.values.compactMap { "\($0)" })
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        result[key] = singleValue
+      } else {
+        result[key] = values
+      }
+    }
+
+    return result
+  }
+
+  // Helper to collect target build settings with inheritance info (setting-centric)
+  private func collectTargetBuildSettingsData(
+    target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
+  ) -> [String: Any] {
+    guard let targetConfigList = target.buildConfigurationList else {
+      return [:]
+    }
+
+    var result: [String: Any] = [:]
+    let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+    // Collect all settings across configurations
+    var allSettingKeys = Set<String>()
+    var targetSettingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+    var projectSettingsData: [String: [String: Any]] = [:]  // For inheritance tracking
+
+    for config in targetConfigList.buildConfigurations {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      targetSettingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+
+      // Get project settings for this config if showing inherited
+      if showInherited {
+        if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+          $0.name == config.name
+        }) {
+          projectSettingsData[config.name] = projectConfig.buildSettings
+          allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+        }
+      }
+    }
+
+    // Build setting-centric structure
+    for key in allSettingKeys {
+      var values: [String: Any] = [:]
+      var sources: [String: String] = [:]  // Track source of each value
+      var hasTargetSetting = false
+
+      for configName in targetSettingsData.keys {
+        if let targetValue = targetSettingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValueForJSON(targetValue)
+          sources[configName] = "target"
+          hasTargetSetting = true
+        } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValueForJSON(projectValue)
+          sources[configName] = "project"
+        }
+      }
+
+      // Skip inherited-only settings if not showing inherited
+      if !hasTargetSetting && !showInherited {
+        continue
+      }
+
+      // If all configs have the same value and source, simplify
+      let uniqueValues = Set(values.values.compactMap { "\($0)" })
+      let uniqueSources = Set(sources.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        // All configs have same value
+        if showInherited && uniqueSources.count == 1, let source = sources.values.first {
+          // Include source info if showing inherited
+          result[key] = [
+            "value": singleValue,
+            "source": source,
+          ]
+        } else {
+          // Just the value if not showing inherited or all from target
+          result[key] = singleValue
+        }
+      } else {
+        // Different values per config
+        if showInherited {
+          // Include source info for each config
+          var configData: [String: Any] = [:]
+          for (configName, value) in values {
+            configData[configName] = [
+              "value": value,
+              "source": sources[configName] ?? "unknown",
+            ]
+          }
+          result[key] = configData
+        } else {
+          // Just values without source
+          result[key] = values
+        }
+      }
+    }
+
+    return result
+  }
+
+  // Format value for JSON output
+  private func formatBuildSettingValueForJSON(_ value: Any) -> Any {
+    if let arrayValue = value as? [String] {
+      return arrayValue
+    }
+    return formatBuildSettingValue(value)
+  }
+
+  // List all build settings (project + all targets)
+  private func listAllBuildSettings(configuration: String? = nil, showInherited: Bool = false) {
+    // Display settings directly for project
+    let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+    print("🏗️  Build Settings for Project: \(projectName)")
+    print("─" + String(repeating: "─", count: 80))
+    print("")
+
+    displayProjectBuildSettings(configuration: configuration)
+
+    // All targets
+    for target in pbxproj.nativeTargets {
+      print("")
+      print("🎯 Build Settings for Target: \(target.name)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      displayTargetBuildSettings(
+        target: target,
+        configuration: configuration,
+        showInherited: showInherited
+      )
+    }
+  }
+
+  // Helper to display project settings without header
+  private func displayProjectBuildSettings(configuration: String? = nil) {
+    guard let configList = pbxproj.rootObject?.buildConfigurationList else {
+      print("  (No project build configuration found)")
+      return
+    }
+
+    // Get all configurations
+    let configs = configList.buildConfigurations
+    let configNames = configs.map { $0.name }
+
+    // Collect all unique setting keys across all configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+    }
+
+    // Filter configs if specific configuration requested
+    let activeConfigs = configuration != nil ? [configuration!] : configNames
+
+    if allSettingKeys.isEmpty {
+      print("  (No explicit settings defined)")
+      return
+    }
+
+    // Sort settings alphabetically
+    let sortedKeys = allSettingKeys.sorted()
+
+    // Display each setting with its values across configurations
+    for key in sortedKeys {
+      var values: [String: String] = [:]
+
+      for configName in activeConfigs {
+        if let value = settingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValue(value)
+        }
+      }
+
+      // Check if all configs have the same value
+      let uniqueValues = Set(values.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        // Same value across all configurations - display inline
+        print("  \(key): \(singleValue)")
+      } else {
+        // Different values per configuration - show on separate lines
+        print("  \(key)")
+        for configName in activeConfigs.sorted() {
+          if let value = values[configName] {
+            print("    \(configName): \(value)")
+          }
+        }
+      }
+    }
+  }
+
+  // Helper to display target settings without header
+  private func displayTargetBuildSettings(
+    target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
+  ) {
+    guard let targetConfigList = target.buildConfigurationList else {
+      print("  (No build configuration found)")
+      return
+    }
+
+    // Get all configurations
+    let configs = targetConfigList.buildConfigurations
+    let configNames = configs.map { $0.name }
+
+    // Get project-level settings for comparison
+    let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+    // Collect all unique setting keys across all configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+    var projectSettingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+
+      // Get project settings for this config
+      if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+        $0.name == config.name
+      }) {
+        projectSettingsData[config.name] = projectConfig.buildSettings
+        if showInherited {
+          allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+        }
+      }
+    }
+
+    // Filter configs if specific configuration requested
+    let activeConfigs: [String]
+    if let config = configuration {
+      activeConfigs = [config]
+    } else {
+      activeConfigs = configNames
+    }
+
+    if allSettingKeys.isEmpty && !showInherited {
+      print("  (No explicit settings defined at target level)")
+      return
+    }
+
+    // Sort settings alphabetically
+    let sortedKeys = allSettingKeys.sorted()
+
+    // Display each setting with its values across configurations
+    for key in sortedKeys {
+      let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
+        key: key,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        projectSettingsData: projectSettingsData,
+        showInherited: showInherited
+      )
+
+      if !hasTargetSetting && !showInherited {
+        continue  // Skip inherited-only settings if not showing inherited
+      }
+
+      displaySettingValues(
+        key: key,
+        values: values,
+        inheritedValues: inheritedValues,
+        isInheritedOnly: isInheritedOnly,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        showInherited: showInherited
+      )
+    }
+  }
+
   // MARK: - Validation
   func validate() -> [String] {
     var issues: [String] = []
@@ -1283,7 +2116,7 @@ class XcodeProjUtility {
   }
 
   func listInvalidReferences() {
-    print("🔍 Checking for invalid file references...")
+    print("🔍 Checking for invalid file and folder references...")
 
     var invalidRefs: [(group: String, path: String, issue: String)] = []
     let fileManager = FileManager.default
@@ -1336,8 +2169,63 @@ class XcodeProjUtility {
       return basePath + Path(filePath)
     }
 
+    // Helper to resolve absolute path for a group (folder)
+    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
+      // Skip groups without a path (they're just organizational)
+      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
+
+      var basePath = projectDir
+      var pathComponents: [String] = []
+      var currentGroup: PBXGroup? = group
+
+      // Build path from group hierarchy
+      while let g = currentGroup {
+        if let path = g.path, !path.isEmpty {
+          pathComponents.insert(path, at: 0)
+        }
+        // Find parent group
+        currentGroup = pbxproj.groups.first { parent in
+          parent.children.contains { $0 === g }
+        }
+      }
+
+      for component in pathComponents {
+        basePath = basePath + Path(component)
+      }
+
+      return basePath
+    }
+
     // Check each file reference
     func checkFilesInGroup(_ group: PBXGroup, groupPath: String) {
+      // First check if the group itself represents a folder that should exist
+      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
+        let pathString = absoluteGroupPath.string
+        if !fileManager.fileExists(atPath: pathString) {
+          let displayPath = group.path ?? group.name ?? "unknown"
+          invalidRefs.append(
+            (
+              group: groupPath.isEmpty ? "Root" : groupPath,
+              path: displayPath,
+              issue: "Folder not found at: \(pathString)"
+            ))
+        } else {
+          // Check if it's actually a directory
+          var isDirectory: ObjCBool = false
+          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
+          if !isDirectory.boolValue {
+            let displayPath = group.path ?? group.name ?? "unknown"
+            invalidRefs.append(
+              (
+                group: groupPath.isEmpty ? "Root" : groupPath,
+                path: displayPath,
+                issue: "Expected folder but found file at: \(pathString)"
+              ))
+          }
+        }
+      }
+
+      // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
           if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
@@ -1407,7 +2295,7 @@ class XcodeProjUtility {
   }
 
   func removeInvalidReferences() {
-    print("🔍 Checking for invalid file references to remove...")
+    print("🔍 Checking for invalid file and folder references to remove...")
 
     var removedCount = 0
     let fileManager = FileManager.default
@@ -1460,10 +2348,58 @@ class XcodeProjUtility {
       return basePath + Path(filePath)
     }
 
+    // Helper to resolve absolute path for a group (folder)
+    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
+      // Skip groups without a path (they're just organizational)
+      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
+
+      var basePath = projectDir
+      var pathComponents: [String] = []
+      var currentGroup: PBXGroup? = group
+
+      // Build path from group hierarchy
+      while let g = currentGroup {
+        if let path = g.path, !path.isEmpty {
+          pathComponents.insert(path, at: 0)
+        }
+        // Find parent group
+        currentGroup = pbxproj.groups.first { parent in
+          parent.children.contains { $0 === g }
+        }
+      }
+
+      for component in pathComponents {
+        basePath = basePath + Path(component)
+      }
+
+      return basePath
+    }
+
     // Collect invalid references to remove
     var refsToRemove: [PBXFileReference] = []
+    var groupsToRemove: [PBXGroup] = []
 
     func findInvalidFilesInGroup(_ group: PBXGroup) {
+      // First check if the group itself represents a folder that should exist
+      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
+        let pathString = absoluteGroupPath.string
+        if !fileManager.fileExists(atPath: pathString) {
+          groupsToRemove.append(group)
+          let displayPath = group.path ?? group.name ?? "unknown"
+          print("  ❌ Will remove folder: \(displayPath)")
+        } else {
+          // Check if it's actually a directory
+          var isDirectory: ObjCBool = false
+          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
+          if !isDirectory.boolValue {
+            groupsToRemove.append(group)
+            let displayPath = group.path ?? group.name ?? "unknown"
+            print("  ❌ Will remove folder: \(displayPath) (not a directory)")
+          }
+        }
+      }
+
+      // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
           if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
@@ -1504,7 +2440,16 @@ class XcodeProjUtility {
       findInvalidFilesInGroup(rootGroup)
     }
 
-    // Remove invalid references
+    // Remove invalid groups
+    for groupToRemove in groupsToRemove {
+      // Remove from parent groups
+      for group in pbxproj.groups {
+        group.children.removeAll { $0 === groupToRemove }
+      }
+      removedCount += 1
+    }
+
+    // Remove invalid file references
     for fileRef in refsToRemove {
       // Remove from all groups
       for group in pbxproj.groups {
@@ -1545,6 +2490,154 @@ class XcodeProjUtility {
       print("✅ No invalid references to remove")
     } else {
       print("✅ Removed \(removedCount) invalid file reference(s)")
+    }
+  }
+
+  // MARK: - Tree Display
+  func listProjectTree() {
+    if let rootGroup = pbxproj.rootObject?.mainGroup {
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print(projectName)
+
+      // Process root group's children directly
+      let children = rootGroup.children
+      for (index, child) in children.enumerated() {
+        let childIsLast = (index == children.count - 1)
+        printTreeNode(child, prefix: "", isLast: childIsLast, parentPath: "")
+      }
+    } else {
+      print("❌ No project structure found")
+    }
+  }
+
+  func listGroupsTree() {
+    if let rootGroup = pbxproj.rootObject?.mainGroup {
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print(projectName)
+
+      // Process root group's children directly, showing only groups
+      let children = rootGroup.children
+      let groupChildren = children.filter {
+        $0 is PBXGroup || $0 is PBXFileSystemSynchronizedRootGroup
+      }
+
+      for (index, child) in groupChildren.enumerated() {
+        let childIsLast = (index == groupChildren.count - 1)
+        printGroupsOnly(child, prefix: "", isLast: childIsLast)
+      }
+    } else {
+      print("❌ No project structure found")
+    }
+  }
+
+  private func printGroupsOnly(_ element: PBXFileElement, prefix: String, isLast: Bool) {
+    let connector = isLast ? "└── " : "├── "
+    let continuation = isLast ? "    " : "│   "
+
+    // Only process groups
+    if let group = element as? PBXGroup {
+      let name = group.name ?? group.path ?? "unknown"
+      print("\(prefix)\(connector)\(name)")
+
+      // Filter children to show only groups
+      let groupChildren = group.children.filter {
+        $0 is PBXGroup || $0 is PBXFileSystemSynchronizedRootGroup
+      }
+
+      for (index, child) in groupChildren.enumerated() {
+        let childIsLast = (index == groupChildren.count - 1)
+        printGroupsOnly(child, prefix: prefix + continuation, isLast: childIsLast)
+      }
+    } else if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
+      let name = syncGroup.name ?? syncGroup.path ?? "unknown"
+      print("\(prefix)\(connector)\(name) [synchronized]")
+    }
+  }
+
+  private func printTreeNode(
+    _ element: PBXFileElement, prefix: String, isLast: Bool, parentPath: String
+  ) {
+    let connector = isLast ? "└── " : "├── "
+    let continuation = isLast ? "    " : "│   "
+
+    // Get display name
+    let name = element.name ?? element.path ?? "unknown"
+
+    // Determine if this is an actual file/folder reference or a virtual group
+    let isFileReference = element is PBXFileReference
+    let isSyncFolder = element is PBXFileSystemSynchronizedRootGroup
+
+    // For actual file/folder references, show the path
+    if isFileReference {
+      if let fileRef = element as? PBXFileReference {
+        // Build the full path for file references
+        let elementPath = fileRef.path ?? fileRef.name ?? ""
+        let fullPath: String
+        if parentPath.isEmpty {
+          fullPath = elementPath
+        } else if elementPath.isEmpty {
+          fullPath = parentPath
+        } else {
+          fullPath = "\(parentPath)/\(elementPath)"
+        }
+
+        // Check if it's a folder reference (blue folder in Xcode)
+        let isFolderRef =
+          fileRef.lastKnownFileType == "folder"
+          || fileRef.lastKnownFileType == "folder.assetcatalog"
+          || fileRef.lastKnownFileType == "wrapper.framework"
+
+        if isFolderRef {
+          print("\(prefix)\(connector)\(name) (\(fullPath)) [folder reference]")
+        } else {
+          print("\(prefix)\(connector)\(name) (\(fullPath))")
+        }
+      }
+    } else if isSyncFolder {
+      // Synchronized folders (Xcode 16+)
+      if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
+        let elementPath = syncGroup.path ?? syncGroup.name ?? ""
+        let fullPath: String
+        if parentPath.isEmpty {
+          fullPath = elementPath
+        } else if elementPath.isEmpty {
+          fullPath = parentPath
+        } else {
+          fullPath = "\(parentPath)/\(elementPath)"
+        }
+        print("\(prefix)\(connector)\(name) (\(fullPath)) [synchronized]")
+      }
+    } else {
+      // Virtual groups - just show the name without path
+      print("\(prefix)\(connector)\(name)")
+    }
+
+    // Build path for children (considering virtual groups)
+    let childPath: String
+    if let group = element as? PBXGroup {
+      // For virtual groups, keep the parent path
+      // For groups with a path, append it
+      if let groupPath = group.path, !groupPath.isEmpty {
+        childPath = parentPath.isEmpty ? groupPath : "\(parentPath)/\(groupPath)"
+      } else {
+        childPath = parentPath
+      }
+    } else if isFileReference {
+      // File references don't have children, but just in case
+      let elementPath = element.path ?? element.name ?? ""
+      childPath = parentPath.isEmpty ? elementPath : "\(parentPath)/\(elementPath)"
+    } else {
+      childPath = parentPath
+    }
+
+    // Recurse for groups
+    if let group = element as? PBXGroup {
+      let children = group.children
+      for (index, child) in children.enumerated() {
+        let childIsLast = (index == children.count - 1)
+        printTreeNode(
+          child, prefix: prefix + continuation, isLast: childIsLast, parentPath: childPath)
+      }
     }
   }
 
@@ -1603,17 +2696,18 @@ struct CLI {
       Usage: xcodeproj-cli.swift [--project <path>] <command> [options]
 
       Options:
-        --project <path>  Path to .xcodeproj file (default: MyProject.xcodeproj)
+        --project <path>  Path to .xcodeproj file (default: looks for *.xcodeproj in current directory)
         --dry-run         Preview changes without saving
         --version         Display version information
         --help, -h        Show this help message
 
       FILE & FOLDER OPERATIONS:
         
-        Understanding Groups vs Folders:
-        • Groups: Virtual organization in Xcode only (yellow folder icon)
-        • add-folder: Adds files from a folder individually (you control what's included)
-        • add-sync-folder: Creates folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
+        Understanding Groups, Folders, and References:
+        • add-group: Creates empty virtual groups for organization (yellow folder icon)
+        • add-folder: Creates a group and adds files from a filesystem folder (yellow folder icon)
+        • add-sync-folder: Creates a folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
+        • remove-group: Removes any group, folder group, or synced folder from the project
         
         add-file <file-path> --group <group> --targets <target1,target2>
           Add a single file to specified group and targets
@@ -1628,9 +2722,10 @@ struct CLI {
           Example: add-files Helper.swift:Utils Logger.swift:Debug -t MyApp,Tests
           
         add-folder <folder-path> --group <group> --targets <target1,target2> [--recursive]
-          Add all files from a folder as individual file references
+          Creates a group and adds all files from a filesystem folder as individual references
+          The created group will be a regular Xcode group (yellow folder icon)
           Short flags: -g for group, -t for targets, -r for recursive
-          Groups are created automatically if they don't exist
+          Parent groups are created automatically if they don't exist
           Example: add-folder Sources/Features --group Features --targets MyApp --recursive
           Example: add-folder UI -g Presentation -t MyApp,Tests -r
           
@@ -1651,12 +2746,11 @@ struct CLI {
           Example: remove-file Sources/Old/Legacy.swift
           
         remove-group <group-name>
-          Remove a group and all its contents from the project
+          Remove any group (virtual, folder-based, or synced) and all its contents
+          Works with groups created by add-group, add-folder, or add-sync-folder
           Example: remove-group Features/OldFeature
-          
-        remove-folder <folder-name>
-          Remove a folder reference or group from the project
-          Example: remove-folder Resources
+          Example: remove-group Resources  (removes folder group)
+          Note: 'remove-folder' is deprecated but still works as an alias
           
       TARGET OPERATIONS:
         add-target <name> --type <product-type> --bundle-id <id> [--platform iOS|macOS|tvOS|watchOS]
@@ -1708,14 +2802,31 @@ struct CLI {
           Display build settings for a target
           Example: get-build-settings MyApp --config Debug
           
+        list-build-settings [--target <target>] [--config <configuration>] [--show-inherited|-i] [--json|-j] [--all|-a]
+          List all build settings for a target or project
+          Without --target: shows project-level settings
+          With --target: shows target-level settings (and which override project settings)
+          --show-inherited|-i: also displays settings inherited from project level
+          --json|-j: output as JSON format
+          --all|-a: show settings for project and all targets
+          Examples: 
+            list-build-settings                                # Show project settings
+            list-build-settings --target MyApp                 # Show target settings
+            list-build-settings -t MyApp --config Debug        # Show Debug config only
+            list-build-settings -t MyApp --show-inherited      # Include inherited settings
+            list-build-settings --json                         # Output project settings as JSON
+            list-build-settings --all                          # Show all project and target settings
+            list-build-settings -a -j                          # All settings in JSON format
+          
         list-build-configs [--target <target-name>]
           List available build configurations (Debug, Release, etc.)
           
       PROJECT STRUCTURE:
-        create-groups <group1/subgroup1> <group2/subgroup2> ...
-          Create virtual group hierarchy in project navigator (no filesystem folders created)
+        add-group <group1/subgroup1> <group2/subgroup2> ...
+          Add virtual group hierarchy in project navigator (no filesystem folders created)
           Use this to organize files in Xcode without moving them on disk
-          Example: create-groups Features/Login Features/Settings Utils/Extensions
+          Example: add-group Features/Login Features/Settings Utils/Extensions
+          Note: 'create-groups' is still supported as an alias for backward compatibility
           
         update-paths <old-prefix> <new-prefix>
           Batch update file paths with new prefix
@@ -1730,12 +2841,18 @@ struct CLI {
           Show all targets in the project with their types
           
         list-files [group-name]
-          Show files in entire project or specific group
+          Show files in entire project or specific group (flat list)
           Example: list-files
           Example: list-files Sources/Models
+          Note: Consider using 'list-tree' for better visualization
           
         list-groups
-          Show the group hierarchy in the project navigator
+          Show group hierarchy in tree format (no files)
+          Note: Consider using 'list-tree' to also see files
+          
+        list-tree
+          Show complete project structure as a tree (RECOMMENDED)
+          Virtual groups shown as names only, files/folders show paths in parentheses
           
         list-invalid-references
           Find all broken file references (files that don't exist)
@@ -1766,7 +2883,7 @@ struct CLI {
         ./xcodeproj-cli.swift --project MyApp.xcodeproj duplicate-target MyApp MyAppPro --bundle-id com.example.pro
         
         # Reorganizing files:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj create-groups Features/Login Features/Profile Utils
+        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-group Features/Login Features/Profile Utils
         ./xcodeproj-cli.swift --project MyApp.xcodeproj move-file OldName.swift NewName.swift
         ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-group OldFeatures
       """)
@@ -1788,7 +2905,7 @@ struct CLI {
     }
 
     // Extract flags
-    var projectPath = "MyProject.xcodeproj"
+    var projectPath: String? = nil
     var dryRun = false
     var filteredArgs = args
 
@@ -1805,6 +2922,25 @@ struct CLI {
       }
     }
 
+    // If no project specified, look for .xcodeproj in current directory
+    if projectPath == nil {
+      let fileManager = FileManager.default
+      let currentPath = fileManager.currentDirectoryPath
+      let contents = try fileManager.contentsOfDirectory(atPath: currentPath)
+      let xcodeprojFiles = contents.filter { $0.hasSuffix(".xcodeproj") }
+
+      if xcodeprojFiles.isEmpty {
+        throw ProjectError.invalidArguments(
+          "No .xcodeproj file found in current directory. Use --project to specify the path.")
+      } else if xcodeprojFiles.count > 1 {
+        throw ProjectError.invalidArguments(
+          "Multiple .xcodeproj files found: \(xcodeprojFiles.joined(separator: ", ")). Use --project to specify which one."
+        )
+      } else {
+        projectPath = xcodeprojFiles[0]
+      }
+    }
+
     // Process --dry-run flag
     if let dryRunIndex = filteredArgs.firstIndex(of: "--dry-run") {
       dryRun = true
@@ -1817,7 +2953,7 @@ struct CLI {
       exit(0)
     }
 
-    let utility = try XcodeProjUtility(path: projectPath)
+    let utility = try XcodeProjUtility(path: projectPath!)
     let remainingArgs = Array(filteredArgs.dropFirst())
 
     // Parse the remaining arguments using the new parser
@@ -1916,17 +3052,11 @@ struct CLI {
       }
       try utility.removeFile(filePath)
 
-    case "remove-group":
+    case "remove-group", "remove-folder":  // remove-folder kept for backward compatibility
       guard let groupPath = parsedArgs.positional.first else {
         throw ProjectError.invalidArguments("remove-group requires: <group-path>")
       }
       try utility.removeGroup(groupPath)
-
-    case "remove-folder":
-      guard let folderPath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-folder requires: <folder-path>")
-      }
-      try utility.removeFolder(folderPath)
 
     case "add-target":
       guard let targetName = parsedArgs.positional.first else {
@@ -2023,24 +3153,30 @@ struct CLI {
       }
       exit(0)
 
+    case "list-build-settings":
+      // Can be called without --target for project settings, or with --target for target settings
+      let targetName = parsedArgs.getFlag("--target", "-t")
+      let config = parsedArgs.getFlag("--config", "-c")
+      let showInherited = parsedArgs.hasFlag("--show-inherited", "-i")
+      let outputJSON = parsedArgs.hasFlag("--json", "-j")
+      let showAll = parsedArgs.hasFlag("--all", "-a")
+      utility.listBuildSettings(
+        targetName: targetName, configuration: config, showInherited: showInherited,
+        outputJSON: outputJSON, showAll: showAll)
+      exit(0)
+
     case "list-build-configs":
       let targetName = parsedArgs.getFlag("--target", "-t")
       utility.listBuildConfigurations(for: targetName)
       exit(0)
 
     case "list-groups":
-      print("📁 Groups in project:")
-      for group in utility.pbxproj.groups {
-        if let name = group.name ?? group.path {
-          print("  - \(name)")
-          listGroupHierarchy(group, indent: "    ")
-        }
-      }
+      utility.listGroupsTree()
       exit(0)
 
-    case "create-groups":
+    case "add-group", "create-groups":  // create-groups kept for backward compatibility
       guard !parsedArgs.positional.isEmpty else {
-        throw ProjectError.invalidArguments("create-groups requires: <group1> [group2] ...")
+        throw ProjectError.invalidArguments("add-group requires: <group1> [group2] ...")
       }
       for groupPath in parsedArgs.positional {
         _ = utility.ensureGroupHierarchy(groupPath)
@@ -2100,6 +3236,10 @@ struct CLI {
       }
       exit(0)
 
+    case "list-tree":
+      utility.listProjectTree()
+      exit(0)
+
     default:
       print("❌ Unknown command: \(command)")
       printUsage()
@@ -2124,16 +3264,6 @@ struct CLI {
     }
   }
 
-  static func listGroupHierarchy(_ group: PBXGroup, indent: String = "") {
-    for child in group.children {
-      if let subgroup = child as? PBXGroup {
-        if let name = subgroup.name ?? subgroup.path {
-          print("\(indent)- \(name)")
-          listGroupHierarchy(subgroup, indent: indent + "  ")
-        }
-      }
-    }
-  }
 }
 
 // MARK: - Main

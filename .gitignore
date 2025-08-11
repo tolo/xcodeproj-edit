@@ -15,5 +15,12 @@ DerivedData/
 *.bak
 *~
 
+# Ignore generated test project (will be created by create_test_project.swift)
+test/TestData/TestProject.xcodeproj/
+test/TestData/TestProject.xcodeproj.backup/
+test/TestData/MyFolder/
+test/TestData/TestFolder/
+
 # Claude Code
 .claude/settings.local.json
+ai_docs/temp

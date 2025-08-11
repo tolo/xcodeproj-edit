@@ -160,7 +160,7 @@ struct SecurityTests {
     }
 
     test("Dry run shows intended changes") {
-      let output = runTool(["--dry-run", "create-groups", "TestGroup/SubGroup"])
+      let output = runTool(["--dry-run", "add-group", "TestGroup/SubGroup"])
       return output.contains("Created group") || output.contains("DRY RUN")
     }
 
