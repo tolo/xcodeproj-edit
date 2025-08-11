@@ -74,6 +74,13 @@ struct TestSuite {
       return output.contains("file") || output.contains("No files") || output.contains("📄")
     }
 
+    test("List tree structure") {
+      let output = runTool(["list-tree"])
+      // Check for tree structure elements
+      return output.contains("├──") || output.contains("└──")
+        || (output.contains("Sources") && output.contains("("))
+    }
+
     test("List build configurations") {
       let output = runTool(["list-build-configs"])
       return output.contains("Debug") && output.contains("Release")
@@ -212,7 +219,7 @@ struct TestSuite {
     print("---------------------------")
 
     test("Create groups") {
-      let output = runTool(["create-groups", "Features/Login", "Features/Profile"])
+      let output = runTool(["add-group", "Features/Login", "Features/Profile"])
       return output.contains("Created group") || output.contains("📁")
     }
 
@@ -304,7 +311,7 @@ struct TestSuite {
     test("List invalid references") {
       let output = runTool(["list-invalid-references"])
       // The command should run and produce output about checking references
-      return output.contains("Checking for invalid file references")
+      return output.contains("Checking for invalid file")
         && (output.contains("All file references are valid")
           || output.contains("Found") && output.contains("invalid file reference"))
     }
@@ -326,10 +333,80 @@ struct TestSuite {
       return hasInvalid
     }
 
+    test("List invalid references - with invalid folders") {
+      // Create groups pointing to non-existent folders
+      _ = runTool(["add-group", "InvalidFolder1"])
+      _ = runTool(["add-group", "InvalidFolder2/SubFolder"])
+
+      // Check for invalid references
+      let output = runTool(["list-invalid-references"])
+      let hasInvalidFolders =
+        output.contains("Folder not found")
+        && (output.contains("InvalidFolder1") || output.contains("InvalidFolder2"))
+
+      return hasInvalidFolders
+    }
+
+    test("Remove invalid references - folders") {
+      // Create groups pointing to non-existent folders
+      _ = runTool(["add-group", "TestInvalidDir"])
+      _ = runTool(["add-group", "TestInvalidDir2/SubDir"])
+
+      // Verify they exist as invalid
+      let checkBefore = runTool(["list-invalid-references"])
+      let hasInvalidBefore =
+        checkBefore.contains("Folder not found") && checkBefore.contains("TestInvalidDir")
+
+      // Remove invalid references
+      let removeOutput = runTool(["remove-invalid-references"])
+      let removed =
+        removeOutput.contains("Will remove folder") && removeOutput.contains("TestInvalidDir")
+
+      // Verify they're gone
+      let checkAfter = runTool(["list-invalid-references"])
+      let allValidAfter =
+        checkAfter.contains("All file references are valid")
+        || !checkAfter.contains("TestInvalidDir")
+
+      return hasInvalidBefore && removed && allValidAfter
+    }
+
+    test("Remove invalid references - mixed files and folders") {
+      // Add invalid files
+      _ = runTool([
+        "add-file", "TestInvalidFile.txt", "--group", "Resources", "--targets", "TestApp",
+      ])
+      _ = runTool([
+        "add-file", "TestInvalidCode.swift", "--group", "Sources", "--targets", "TestApp",
+      ])
+
+      // Add invalid folders
+      _ = runTool(["add-group", "MixedInvalidFolder"])
+
+      // Remove all invalid references
+      let removeOutput = runTool(["remove-invalid-references"])
+      let removedFiles =
+        removeOutput.contains("Will remove")
+        && (removeOutput.contains("TestInvalidFile.txt")
+          || removeOutput.contains("TestInvalidCode.swift"))
+      let removedFolders =
+        removeOutput.contains("Will remove folder") && removeOutput.contains("MixedInvalidFolder")
+
+      // Verify they're gone
+      let checkOutput = runTool(["list-invalid-references"])
+      let allValid = checkOutput.contains("All file references are valid")
+
+      return (removedFiles || removedFolders) && allValid
+    }
+
     test("Remove invalid references") {
       // Add non-existent files
-      _ = runTool(["add-file", "TestInvalidFile.txt", "Resources", "TestApp"])
-      _ = runTool(["add-file", "TestInvalidCode.swift", "Sources", "TestApp"])
+      _ = runTool([
+        "add-file", "TestInvalidFile.txt", "--group", "Resources", "--targets", "TestApp",
+      ])
+      _ = runTool([
+        "add-file", "TestInvalidCode.swift", "--group", "Sources", "--targets", "TestApp",
+      ])
 
       // Remove invalid references
       let removeOutput = runTool(["remove-invalid-references"])

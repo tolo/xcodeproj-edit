@@ -519,32 +519,67 @@ class XcodeProjUtility {
       throw ProjectError.operationFailed("File not found: \(filePath)")
     }
 
+    var buildFilesToDelete: Set<PBXBuildFile> = []
+
+    // Collect all build files that reference this file
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
+          if let files = sourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          if let files = resourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
+          if let files = frameworksBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          if let files = copyFilesBuildPhase.files {
+            for buildFile in files where buildFile.file === fileRef {
+              buildFilesToDelete.insert(buildFile)
+            }
+          }
+        }
+      }
+    }
+
     // Remove from all groups
     for group in pbxproj.groups {
       group.children.removeAll { $0 === fileRef }
     }
 
-    // Remove from all build phases
+    // Remove build files from all build phases
     for target in pbxproj.nativeTargets {
       for buildPhase in target.buildPhases {
         if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-          sourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          resourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-          frameworksBuildPhase.files?.removeAll { $0.file === fileRef }
+          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
         if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          copyFilesBuildPhase.files?.removeAll { $0.file === fileRef }
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
         }
       }
     }
 
-    // Remove build files that reference this file
-    let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === fileRef }
-    for buildFile in buildFilesToRemove {
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
       pbxproj.delete(object: buildFile)
     }
 
@@ -555,19 +590,67 @@ class XcodeProjUtility {
   }
 
   func removeGroup(_ groupPath: String) throws {
-    // Find the group to remove
-    guard let group = findGroup(named: groupPath, in: pbxproj.groups) else {
-      throw ProjectError.groupNotFound(groupPath)
+    // First try to find it as a regular group
+    if let group = findGroup(named: groupPath, in: pbxproj.groups) {
+      // Check if this is a special system group that shouldn't be removed
+      if group === pbxproj.rootObject?.productsGroup {
+        throw ProjectError.operationFailed("Cannot remove Products group - it's a system group")
+      }
+      if group === pbxproj.rootObject?.mainGroup {
+        throw ProjectError.operationFailed(
+          "Cannot remove '\(groupPath)' - it is the main project group. This would corrupt the project structure."
+        )
+      }
+
+      removeGroupHierarchy(group)
+      print("✅ Removed group '\(groupPath)'")
+      return
     }
 
+    // Try to find it as a file reference (folder reference)
+    if let folderRef = pbxproj.fileReferences.first(where: {
+      ($0.path == groupPath || $0.name == groupPath)
+        && ($0.lastKnownFileType == "folder" || $0.lastKnownFileType == "folder.assetcatalog")
+    }) {
+      removeFolderReference(folderRef)
+      print("✅ Removed folder reference '\(groupPath)'")
+      return
+    }
+
+    // Try to find it as a synchronized folder
+    if let syncGroup = pbxproj.fileSystemSynchronizedRootGroups.first(where: {
+      $0.path == groupPath || $0.name == groupPath
+    }) {
+      removeSynchronizedFolder(syncGroup)
+      print("✅ Removed synchronized folder '\(groupPath)'")
+      return
+    }
+
+    throw ProjectError.groupNotFound(groupPath)
+  }
+
+  private func removeGroupHierarchy(_ group: PBXGroup) {
     // Recursively collect all file references in this group and subgroups
     var filesToRemove: [PBXFileReference] = []
     var groupsToRemove: [PBXGroup] = [group]
+    var variantGroupsToRemove: [PBXVariantGroup] = []
+    var allChildrenToRemove: [PBXFileElement] = []
+    var buildFilesToDelete: Set<PBXBuildFile> = []
 
     func collectFilesAndGroups(from group: PBXGroup) {
       for child in group.children {
+        allChildrenToRemove.append(child)
+
         if let fileRef = child as? PBXFileReference {
           filesToRemove.append(fileRef)
+        } else if let variantGroup = child as? PBXVariantGroup {
+          variantGroupsToRemove.append(variantGroup)
+          // Collect files from variant group
+          for variantChild in variantGroup.children {
+            if let variantFileRef = variantChild as? PBXFileReference {
+              filesToRemove.append(variantFileRef)
+            }
+          }
         } else if let subgroup = child as? PBXGroup {
           groupsToRemove.append(subgroup)
           collectFilesAndGroups(from: subgroup)
@@ -577,87 +660,171 @@ class XcodeProjUtility {
 
     collectFilesAndGroups(from: group)
 
-    // Remove all files from build phases
+    // First, collect all build files that need to be removed
     for fileRef in filesToRemove {
-      // Remove from all build phases
+      // Collect build files from all build phases
       for target in pbxproj.nativeTargets {
         for buildPhase in target.buildPhases {
           if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-            sourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = sourcesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            resourcesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = resourcesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-            frameworksBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = frameworksBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
           if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            copyFilesBuildPhase.files?.removeAll { $0.file === fileRef }
+            if let files = copyFilesBuildPhase.files {
+              for buildFile in files where buildFile.file === fileRef {
+                buildFilesToDelete.insert(buildFile)
+              }
+            }
           }
         }
       }
+    }
 
-      // Remove build files that reference this file
-      let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === fileRef }
-      for buildFile in buildFilesToRemove {
-        pbxproj.delete(object: buildFile)
+    // Remove build files from their respective build phases
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
+          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
+          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
       }
+    }
 
-      // Remove file reference from project
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
+      pbxproj.delete(object: buildFile)
+    }
+
+    // Remove file references from project
+    for fileRef in filesToRemove {
       pbxproj.delete(object: fileRef)
     }
 
-    // Remove the group from its parent
+    // Remove variant groups from project
+    for variantGroup in variantGroupsToRemove {
+      pbxproj.delete(object: variantGroup)
+    }
+
+    // Remove the group from its parent (including main project group)
     for parentGroup in pbxproj.groups {
       parentGroup.children.removeAll { $0 === group }
+    }
+
+    // Also check if the group is in the main project's mainGroup
+    if let mainGroup = pbxproj.rootObject?.mainGroup {
+      mainGroup.children.removeAll { $0 === group }
     }
 
     // Remove all groups from project
     for groupToRemove in groupsToRemove {
       pbxproj.delete(object: groupToRemove)
     }
-
-    print("✅ Removed group '\(groupPath)' and \(filesToRemove.count) file(s)")
   }
 
-  func removeFolder(_ folderPath: String) throws {
-    // This function removes a folder reference (filesystem-synced folder)
-    // First try to find it as a file reference with folder type
-    if let folderRef = pbxproj.fileReferences.first(where: {
-      ($0.path == folderPath || $0.name == folderPath)
-        && ($0.lastKnownFileType == "folder" || $0.lastKnownFileType == "folder.assetcatalog")
-    }) {
-      // Remove from all groups
-      for group in pbxproj.groups {
-        group.children.removeAll { $0 === folderRef }
-      }
+  private func removeFolderReference(_ folderRef: PBXFileReference) {
+    var buildFilesToDelete: Set<PBXBuildFile> = []
 
-      // Remove from resource build phases (folders are typically in resources)
-      for target in pbxproj.nativeTargets {
-        for buildPhase in target.buildPhases {
-          if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            resourcesBuildPhase.files?.removeAll { $0.file === folderRef }
+    // Collect all build files that reference this folder
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          if let files = resourcesBuildPhase.files {
+            for buildFile in files where buildFile.file === folderRef {
+              buildFilesToDelete.insert(buildFile)
+            }
           }
-          if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            copyFilesBuildPhase.files?.removeAll { $0.file === folderRef }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          if let files = copyFilesBuildPhase.files {
+            for buildFile in files where buildFile.file === folderRef {
+              buildFilesToDelete.insert(buildFile)
+            }
           }
         }
       }
-
-      // Remove build files
-      let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === folderRef }
-      for buildFile in buildFilesToRemove {
-        pbxproj.delete(object: buildFile)
-      }
-
-      // Remove from project
-      pbxproj.delete(object: folderRef)
-
-      print("✅ Removed folder reference '\(folderPath)'")
-    } else {
-      // If not found as folder reference, try as group
-      try removeGroup(folderPath)
     }
+
+    // Remove from all groups
+    for group in pbxproj.groups {
+      group.children.removeAll { $0 === folderRef }
+    }
+
+    // Remove build files from resource build phases
+    for target in pbxproj.nativeTargets {
+      for buildPhase in target.buildPhases {
+        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
+          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
+          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
+        }
+      }
+    }
+
+    // Delete all collected build files from the project
+    for buildFile in buildFilesToDelete {
+      pbxproj.delete(object: buildFile)
+    }
+
+    // Remove the folder reference from project
+    pbxproj.delete(object: folderRef)
+  }
+
+  private func removeSynchronizedFolder(_ syncGroup: PBXFileSystemSynchronizedRootGroup) {
+    // Remove from parent groups
+    for group in pbxproj.groups {
+      group.children.removeAll { $0 === syncGroup }
+    }
+
+    // Remove from build phases if needed
+    for target in pbxproj.nativeTargets {
+      // Remove from build phase membership exceptions if present
+      target.buildPhases.forEach { phase in
+        if let sourcePhase = phase as? PBXSourcesBuildPhase {
+          sourcePhase.files?.removeAll { file in
+            // Check if this build file is related to the sync group
+            if let fileRef = file.file as? PBXFileSystemSynchronizedRootGroup {
+              return fileRef === syncGroup
+            }
+            return false
+          }
+        }
+      }
+    }
+
+    // Remove the synchronized group from project
+    pbxproj.delete(object: syncGroup)
+  }
+
+  func removeFolder(_ folderPath: String) throws {
+    // Deprecated: This function now just calls removeGroup for consistency
+    // Kept for backward compatibility
+    try removeGroup(folderPath)
   }
 
   // Add synchronized folder reference (Xcode 16+ filesystem synchronized group)
@@ -1283,7 +1450,7 @@ class XcodeProjUtility {
   }
 
   func listInvalidReferences() {
-    print("🔍 Checking for invalid file references...")
+    print("🔍 Checking for invalid file and folder references...")
 
     var invalidRefs: [(group: String, path: String, issue: String)] = []
     let fileManager = FileManager.default
@@ -1336,8 +1503,63 @@ class XcodeProjUtility {
       return basePath + Path(filePath)
     }
 
+    // Helper to resolve absolute path for a group (folder)
+    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
+      // Skip groups without a path (they're just organizational)
+      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
+
+      var basePath = projectDir
+      var pathComponents: [String] = []
+      var currentGroup: PBXGroup? = group
+
+      // Build path from group hierarchy
+      while let g = currentGroup {
+        if let path = g.path, !path.isEmpty {
+          pathComponents.insert(path, at: 0)
+        }
+        // Find parent group
+        currentGroup = pbxproj.groups.first { parent in
+          parent.children.contains { $0 === g }
+        }
+      }
+
+      for component in pathComponents {
+        basePath = basePath + Path(component)
+      }
+
+      return basePath
+    }
+
     // Check each file reference
     func checkFilesInGroup(_ group: PBXGroup, groupPath: String) {
+      // First check if the group itself represents a folder that should exist
+      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
+        let pathString = absoluteGroupPath.string
+        if !fileManager.fileExists(atPath: pathString) {
+          let displayPath = group.path ?? group.name ?? "unknown"
+          invalidRefs.append(
+            (
+              group: groupPath.isEmpty ? "Root" : groupPath,
+              path: displayPath,
+              issue: "Folder not found at: \(pathString)"
+            ))
+        } else {
+          // Check if it's actually a directory
+          var isDirectory: ObjCBool = false
+          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
+          if !isDirectory.boolValue {
+            let displayPath = group.path ?? group.name ?? "unknown"
+            invalidRefs.append(
+              (
+                group: groupPath.isEmpty ? "Root" : groupPath,
+                path: displayPath,
+                issue: "Expected folder but found file at: \(pathString)"
+              ))
+          }
+        }
+      }
+
+      // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
           if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
@@ -1407,7 +1629,7 @@ class XcodeProjUtility {
   }
 
   func removeInvalidReferences() {
-    print("🔍 Checking for invalid file references to remove...")
+    print("🔍 Checking for invalid file and folder references to remove...")
 
     var removedCount = 0
     let fileManager = FileManager.default
@@ -1460,10 +1682,58 @@ class XcodeProjUtility {
       return basePath + Path(filePath)
     }
 
+    // Helper to resolve absolute path for a group (folder)
+    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
+      // Skip groups without a path (they're just organizational)
+      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
+
+      var basePath = projectDir
+      var pathComponents: [String] = []
+      var currentGroup: PBXGroup? = group
+
+      // Build path from group hierarchy
+      while let g = currentGroup {
+        if let path = g.path, !path.isEmpty {
+          pathComponents.insert(path, at: 0)
+        }
+        // Find parent group
+        currentGroup = pbxproj.groups.first { parent in
+          parent.children.contains { $0 === g }
+        }
+      }
+
+      for component in pathComponents {
+        basePath = basePath + Path(component)
+      }
+
+      return basePath
+    }
+
     // Collect invalid references to remove
     var refsToRemove: [PBXFileReference] = []
+    var groupsToRemove: [PBXGroup] = []
 
     func findInvalidFilesInGroup(_ group: PBXGroup) {
+      // First check if the group itself represents a folder that should exist
+      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
+        let pathString = absoluteGroupPath.string
+        if !fileManager.fileExists(atPath: pathString) {
+          groupsToRemove.append(group)
+          let displayPath = group.path ?? group.name ?? "unknown"
+          print("  ❌ Will remove folder: \(displayPath)")
+        } else {
+          // Check if it's actually a directory
+          var isDirectory: ObjCBool = false
+          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
+          if !isDirectory.boolValue {
+            groupsToRemove.append(group)
+            let displayPath = group.path ?? group.name ?? "unknown"
+            print("  ❌ Will remove folder: \(displayPath) (not a directory)")
+          }
+        }
+      }
+
+      // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
           if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
@@ -1504,7 +1774,16 @@ class XcodeProjUtility {
       findInvalidFilesInGroup(rootGroup)
     }
 
-    // Remove invalid references
+    // Remove invalid groups
+    for groupToRemove in groupsToRemove {
+      // Remove from parent groups
+      for group in pbxproj.groups {
+        group.children.removeAll { $0 === groupToRemove }
+      }
+      removedCount += 1
+    }
+
+    // Remove invalid file references
     for fileRef in refsToRemove {
       // Remove from all groups
       for group in pbxproj.groups {
@@ -1545,6 +1824,59 @@ class XcodeProjUtility {
       print("✅ No invalid references to remove")
     } else {
       print("✅ Removed \(removedCount) invalid file reference(s)")
+    }
+  }
+
+  // MARK: - Tree Display
+  func listProjectTree() {
+    if let rootGroup = pbxproj.rootObject?.mainGroup {
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print(projectName)
+      printTreeNode(rootGroup, prefix: "", isLast: true, parentPath: "")
+    } else {
+      print("❌ No project structure found")
+    }
+  }
+
+  private func printTreeNode(
+    _ element: PBXFileElement, prefix: String, isLast: Bool, parentPath: String
+  ) {
+    let connector = isLast ? "└── " : "├── "
+    let continuation = isLast ? "    " : "│   "
+
+    // Get display name and path
+    let name = element.name ?? element.path ?? "unknown"
+    let elementPath = element.path ?? element.name ?? ""
+
+    // Build full path
+    let fullPath: String
+    if parentPath.isEmpty {
+      fullPath = elementPath
+    } else if elementPath.isEmpty {
+      fullPath = parentPath
+    } else {
+      fullPath = "\(parentPath)/\(elementPath)"
+    }
+
+    // Print with format: Name (path)
+    if !elementPath.isEmpty {
+      print("\(prefix)\(connector)\(name) (\(fullPath))")
+    } else if element.name != nil {
+      // For groups with only a name but no path
+      print("\(prefix)\(connector)\(name)")
+    }
+
+    // Recurse for groups
+    if let group = element as? PBXGroup {
+      let children = group.children
+      for (index, child) in children.enumerated() {
+        let childIsLast = (index == children.count - 1)
+        printTreeNode(
+          child, prefix: prefix + continuation, isLast: childIsLast, parentPath: fullPath)
+      }
+    } else if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
+      // Handle synchronized folders (Xcode 16+)
+      print("\(prefix)\(continuation)[synchronized folder]")
     }
   }
 
@@ -1603,17 +1935,18 @@ struct CLI {
       Usage: xcodeproj-cli.swift [--project <path>] <command> [options]
 
       Options:
-        --project <path>  Path to .xcodeproj file (default: MyProject.xcodeproj)
+        --project <path>  Path to .xcodeproj file (default: looks for *.xcodeproj in current directory)
         --dry-run         Preview changes without saving
         --version         Display version information
         --help, -h        Show this help message
 
       FILE & FOLDER OPERATIONS:
         
-        Understanding Groups vs Folders:
-        • Groups: Virtual organization in Xcode only (yellow folder icon)
-        • add-folder: Adds files from a folder individually (you control what's included)
-        • add-sync-folder: Creates folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
+        Understanding Groups, Folders, and References:
+        • add-group: Creates empty virtual groups for organization (yellow folder icon)
+        • add-folder: Creates a group and adds files from a filesystem folder (yellow folder icon)
+        • add-sync-folder: Creates a folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
+        • remove-group: Removes any group, folder group, or synced folder from the project
         
         add-file <file-path> --group <group> --targets <target1,target2>
           Add a single file to specified group and targets
@@ -1628,9 +1961,10 @@ struct CLI {
           Example: add-files Helper.swift:Utils Logger.swift:Debug -t MyApp,Tests
           
         add-folder <folder-path> --group <group> --targets <target1,target2> [--recursive]
-          Add all files from a folder as individual file references
+          Creates a group and adds all files from a filesystem folder as individual references
+          The created group will be a regular Xcode group (yellow folder icon)
           Short flags: -g for group, -t for targets, -r for recursive
-          Groups are created automatically if they don't exist
+          Parent groups are created automatically if they don't exist
           Example: add-folder Sources/Features --group Features --targets MyApp --recursive
           Example: add-folder UI -g Presentation -t MyApp,Tests -r
           
@@ -1651,12 +1985,11 @@ struct CLI {
           Example: remove-file Sources/Old/Legacy.swift
           
         remove-group <group-name>
-          Remove a group and all its contents from the project
+          Remove any group (virtual, folder-based, or synced) and all its contents
+          Works with groups created by add-group, add-folder, or add-sync-folder
           Example: remove-group Features/OldFeature
-          
-        remove-folder <folder-name>
-          Remove a folder reference or group from the project
-          Example: remove-folder Resources
+          Example: remove-group Resources  (removes folder group)
+          Note: 'remove-folder' is deprecated but still works as an alias
           
       TARGET OPERATIONS:
         add-target <name> --type <product-type> --bundle-id <id> [--platform iOS|macOS|tvOS|watchOS]
@@ -1712,10 +2045,11 @@ struct CLI {
           List available build configurations (Debug, Release, etc.)
           
       PROJECT STRUCTURE:
-        create-groups <group1/subgroup1> <group2/subgroup2> ...
-          Create virtual group hierarchy in project navigator (no filesystem folders created)
+        add-group <group1/subgroup1> <group2/subgroup2> ...
+          Add virtual group hierarchy in project navigator (no filesystem folders created)
           Use this to organize files in Xcode without moving them on disk
-          Example: create-groups Features/Login Features/Settings Utils/Extensions
+          Example: add-group Features/Login Features/Settings Utils/Extensions
+          Note: 'create-groups' is still supported as an alias for backward compatibility
           
         update-paths <old-prefix> <new-prefix>
           Batch update file paths with new prefix
@@ -1736,6 +2070,10 @@ struct CLI {
           
         list-groups
           Show the group hierarchy in the project navigator
+          
+        list-tree
+          Show complete project structure as a tree with filesystem paths
+          Displays both groups and files with their paths in parentheses
           
         list-invalid-references
           Find all broken file references (files that don't exist)
@@ -1766,7 +2104,7 @@ struct CLI {
         ./xcodeproj-cli.swift --project MyApp.xcodeproj duplicate-target MyApp MyAppPro --bundle-id com.example.pro
         
         # Reorganizing files:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj create-groups Features/Login Features/Profile Utils
+        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-group Features/Login Features/Profile Utils
         ./xcodeproj-cli.swift --project MyApp.xcodeproj move-file OldName.swift NewName.swift
         ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-group OldFeatures
       """)
@@ -1788,7 +2126,7 @@ struct CLI {
     }
 
     // Extract flags
-    var projectPath = "MyProject.xcodeproj"
+    var projectPath: String? = nil
     var dryRun = false
     var filteredArgs = args
 
@@ -1805,6 +2143,25 @@ struct CLI {
       }
     }
 
+    // If no project specified, look for .xcodeproj in current directory
+    if projectPath == nil {
+      let fileManager = FileManager.default
+      let currentPath = fileManager.currentDirectoryPath
+      let contents = try fileManager.contentsOfDirectory(atPath: currentPath)
+      let xcodeprojFiles = contents.filter { $0.hasSuffix(".xcodeproj") }
+
+      if xcodeprojFiles.isEmpty {
+        throw ProjectError.invalidArguments(
+          "No .xcodeproj file found in current directory. Use --project to specify the path.")
+      } else if xcodeprojFiles.count > 1 {
+        throw ProjectError.invalidArguments(
+          "Multiple .xcodeproj files found: \(xcodeprojFiles.joined(separator: ", ")). Use --project to specify which one."
+        )
+      } else {
+        projectPath = xcodeprojFiles[0]
+      }
+    }
+
     // Process --dry-run flag
     if let dryRunIndex = filteredArgs.firstIndex(of: "--dry-run") {
       dryRun = true
@@ -1817,7 +2174,7 @@ struct CLI {
       exit(0)
     }
 
-    let utility = try XcodeProjUtility(path: projectPath)
+    let utility = try XcodeProjUtility(path: projectPath!)
     let remainingArgs = Array(filteredArgs.dropFirst())
 
     // Parse the remaining arguments using the new parser
@@ -1916,17 +2273,11 @@ struct CLI {
       }
       try utility.removeFile(filePath)
 
-    case "remove-group":
+    case "remove-group", "remove-folder":  // remove-folder kept for backward compatibility
       guard let groupPath = parsedArgs.positional.first else {
         throw ProjectError.invalidArguments("remove-group requires: <group-path>")
       }
       try utility.removeGroup(groupPath)
-
-    case "remove-folder":
-      guard let folderPath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-folder requires: <folder-path>")
-      }
-      try utility.removeFolder(folderPath)
 
     case "add-target":
       guard let targetName = parsedArgs.positional.first else {
@@ -2038,9 +2389,9 @@ struct CLI {
       }
       exit(0)
 
-    case "create-groups":
+    case "add-group", "create-groups":  // create-groups kept for backward compatibility
       guard !parsedArgs.positional.isEmpty else {
-        throw ProjectError.invalidArguments("create-groups requires: <group1> [group2] ...")
+        throw ProjectError.invalidArguments("add-group requires: <group1> [group2] ...")
       }
       for groupPath in parsedArgs.positional {
         _ = utility.ensureGroupHierarchy(groupPath)
@@ -2098,6 +2449,10 @@ struct CLI {
           print("  - \(fileRef.path ?? fileRef.name ?? "unknown")")
         }
       }
+      exit(0)
+
+    case "list-tree":
+      utility.listProjectTree()
       exit(0)
 
     default:

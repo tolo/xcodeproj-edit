@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 ## IMPORTANT INSTRUCTIONS ⚠️
 - **NEVER** say things like "you're absolutely right". Instead, **be critical and sceptical** if I say something that you disagree with. Let's discuss it first. We're trying to reduce sycophancy here.
 - **CRITICAL: NEVER CREATE MASSIVE, OVER-ENGINEERED IMPLEMENTATIONS** - Always start minimal and only add complexity when explicitly requested (i.e. use a KISS, YAGNI and DRY approach).
-- Store any temporary files in the `@ai_docs/temp/` directory (if not otherwise specified), **never** in the root directory.
+- Store any temporary files in the `ai_docs/temp/` directory (if not otherwise specified), **never** in the root directory.
 - **WHEN MODIFYING EXISTING CODE**, aim for minimal changes with surgical precision, made methodically step by step, rather than large-scale, broad sweeping changes.
 - **When researching** never include an older year in web searches, i.e. prefer search patterns like "XcodeProj swift example usage" over "XcodeProj swift example usage 2024".
 - **USE CURRENT DATE AND TIME** - Use `date` command for getting current date/time or timestamps information, when comparing file dates, doing research, checking log entries and in many other cases where current date/time is needed.
@@ -43,17 +43,20 @@ validate                              # Check project integrity
 ```
 xcodeproj-cli/
 ├── src/
-│   └── xcodeproj-cli.swift   # Main tool implementation (30+ commands)
+│   └── xcodeproj-cli.swift        # Main tool implementation (30+ commands)
 ├── test/
-│   ├── test.sh                # Shell-based test runner
-│   ├── TestSuite.swift        # Swift test suite
-│   ├── create_test_project.swift # Test project generator
-│   └── TestData/             # Test fixtures (SwiftUI-based)
-├── README.md                  # Main documentation
-├── EXAMPLES.md               # Usage examples and workflows
-├── LICENSE                   # MIT License
-├── VERSION                   # Version tracking
-└── install.sh               # Installation script
+│   ├── TestSuite.swift            # Main Swift test suite
+│   ├── TestRunner.swift           # Test runner utility
+│   ├── AdditionalTests.swift      # Additional test cases
+│   ├── SecurityTests.swift        # Security-focused tests
+│   ├── create_test_project.swift  # Test project generator
+│   ├── README.md                  # Test documentation
+│   └── TestData/                  # Test fixtures
+├── README.md                      # Main documentation
+├── CLAUDE.md                      # Claude AI guidance
+├── CHANGELOG.md                   # Version history
+├── LICENSE                        # MIT License
+├── install.sh                     # Installation script
 ```
 
 ### Core Components
@@ -66,30 +69,106 @@ xcodeproj-cli/
 6. **Build Settings Manager**: Build configuration manipulation
 7. **SPM Integration**: Swift Package Manager dependency management
 
-## Development Philosophy
+### Command Categories
 
-### Core Principles
+#### File Operations
+- `add-file`, `add-files`, `add-folder`, `add-sync-folder`
+- `move-file`, `remove-file`
 
-**No Backwards Compatibility**: We prioritize clean, modern code over maintaining legacy support. Breaking changes are acceptable when improving the tool.
+#### Target Operations
+- `add-target`, `duplicate-target`, `remove-target`
+- `add-dependency`
 
-**Never Use Version Suffixes**: When refactoring, never use names like "v2", "New", "Enhanced", etc. Simply refactor existing implementations in place.
+#### Build Configuration
+- `set-build-setting`, `get-build-settings`
+- `list-build-configs`
 
-**Fail Fast with Clear Messages**: When errors occur, provide immediately actionable error messages that guide users to the solution.
+#### Dependencies
+- `add-framework`
+- `add-swift-package`, `remove-swift-package`, `list-swift-packages`
 
-**Direct Manipulation Over Abstraction**: Prefer direct XcodeProj API usage over creating unnecessary abstraction layers.
+#### Project Structure
+- `create-groups`, `list-groups`
+- `list-files`, `list-targets`
+- `validate`
+
+
+## Critical Development Guidelines and Standards
+
+### Core Development Philosophy
+- **Keep It Simple**: All design and implementations should be as simple as possible, but no simpler. Always prefer efficient and straightforward solutions over complex, over-engineered ones whenever possible. Simple solutions are easier to understand, maintain, and debug.
+- **Avoid Overengineering**: Focus on simplicity and working solutions, not theoretical flexibility. Implement features only when they are needed, not when you anticipate they might be useful in the future (YAGNI).
+- **Dependency Inversion**: High-level modules should not depend on low-level modules. Both should depend on abstractions. This principle enables flexibility and testability.
+- **Separation of Concerns**: Each module or component should have a single responsibility. This makes the codebase easier to understand and maintain.
+- **Avoid Premature Optimization**: Focus on writing clear and maintainable code first. Optimize only when performance issues are identified through profiling or established facts / best practices.
+- **DRY (Don't Repeat Yourself)**: Avoid code duplication by abstracting common functionality into reusable components or services. This reduces maintenance overhead and improves code clarity. But only do this when it makes sense, and doesn't conflict with the *Avoid Overengineering* principle.
+
+### Architectural Considerations
+- Avoid major architectural changes to working features unless explicitly instructed
+- When implementing features, always check existing patterns first
+
+#### Use CUPID for Architectural Decision-Making
+CUPID properties (https://cupid.dev/) focus on creating architectures that are "joyful" to work with. CUPID emphasizes properties rather than rigid rules for architectural design.
+
+- **C - Composable Architecture**: Design system components that harmonize cohesively with minimal dependencies / coupling and clear interfaces / API contracts, framework-agnostic design where possible.
+- **U - Unix Philosophy for Systems**: Apply the Unix philosophy to system boundaries and service design, meaning each service/component does one thing well (single responsibility), appropriate granularity, clear separation between different system concerns, well-defined system boundaries
+- **P - Predictable System Behavior**: Ensure system behavior is consistent and unsurprising, with predictable performance characteristics, well-defined failure modes, clear data flow and state management, and observable and debuggable behavior.
+- **I - Idiomatic Architecture**: Use architecture patterns that are familiar and reduce cognitive load for the development team, including industry-standard architectural patterns, consistent technology choices across the system, familiar deployment and operational patterns, team-appropriate technology selections, and convention-over-configuration approaches.
+- **D - Domain-Aligned Architecture**: Ensure the architecture clearly expresses business concepts and aligns with domain boundaries, including domain-driven design principles, clear separation of business logic from infrastructure concerns, and alignment with business processes and terminology.
+
+### Workflow Patterns
+- Focus only on code relevant to the task
+- Only make changes that are requested or well-understood
+- Preferably create tests BEFORE implementation (TDD)
+- Break complex tasks into smaller, testable units
+- Validate understanding before implementation
+- Always use up-to-date documentation to ensure use of correct APIs
+  - Use the `Context7` MCP for looking up API documentation
+- Update README.md when important/major new features are added, dependencies change, or setup steps are modified.
+
+### Coding Guidelines
+- Log significant operations and errors
+- Use descriptive variable names
+- Use the simplest solution that meets the requirements
+- Avoid code duplication - check for existing similar functionality first
+- Never overwrite .env files without explicit confirmation
+- Make absolutely sure implementations are based on the latest versions of frameworks/libraries
+- Write thorough tests for all major functionality
+
+#### Swft Code Style
+- Use Swift naming conventions (PascalCase for types, camelCase for methods)
+- Prefer guard statements for early returns
+
+### Documentation Guidelines
+- Never document code that is self-explanatory
+- Never write full API-level documentation for application code
+- For complex or non-obvious code, add concise comments explaining the purpose and logic (but only when needed)
+
+### **COMMON PITFALLS TO AVOID**
+- **NEVER** create duplicate files with version numbers or suffixes (e.g., file_v2.xyz, file_new.xyz) when refactoring or improving code
+- **NEVER** modify core frameworks without explicit instruction
+- **NEVER** add dependencies without checking existing alternatives
+- **NEVER** create a new branch unless explicitly instructed to do so
+- **ABSOLUTELY FORBIDDEN: NEVER USE `git rebase --skip` EVER** (can cause data loss and repository corruption, ask the user for help if you encounter rebase conflicts)
+
+**Mandatory Reality Check:**
+Before implementing ANY feature, ask:
+1. **What is the core user need?** (e.g., "validate UI looks right")
+2. **What's the minimal solution?** (e.g., "screenshot comparison")
+3. **Am I adding enterprise features to a simple app?** (if yes, STOP)
+
+
+
+## Project Specific Development Philosophy
 
 ### Code Style
 - Use Swift naming conventions (PascalCase for types, camelCase for methods)
 - Prefer guard statements for early returns
-- Use descriptive error messages with context
-- Keep functions focused and single-purpose
-- Use meaningful variable names
-- Avoid code duplication - check for existing functionality first
+- Use swift-format for consistent formatting
 
 ### Error Handling
 - Use custom `ProjectError` enum for domain-specific errors
 - Provide actionable error messages with specific remediation steps
-- Always validate inputs before operations
 - Fail fast with clear error reporting
 - Exit with meaningful codes (0 = success, 1 = error, specific codes for specific failures)
 
@@ -100,47 +179,6 @@ xcodeproj-cli/
 - Use backup/restore pattern for destructive tests
 - Always verify both positive and negative cases
 
-## Important Patterns
-
-### File Filtering
-The tool automatically excludes:
-- `.DS_Store`, `Thumbs.db`
-- `.git`, `.gitignore`, `.gitkeep`
-- Files ending with `.orig`, `.bak`, `.tmp`, `.temp`
-- Hidden files (except `.h` and `.m`)
-
-### Build Phase Assignment
-- Source files (`.swift`, `.m`, `.mm`, `.c`, `.cpp`) → Sources build phase
-- Resources (`.xib`, `.storyboard`, `.xcassets`, `.strings`) → Resources build phase
-- Frameworks (`.framework`, `.dylib`) → Frameworks build phase
-
-### Group Path Resolution
-- Groups are searched recursively through the project hierarchy
-- Both `path` and `name` properties are checked for matches
-- Parent groups are created automatically if needed
-
-## Command Categories
-
-### File Operations
-- `add-file`, `add-files`, `add-folder`, `add-sync-folder`
-- `move-file`, `remove-file`
-
-### Target Operations
-- `add-target`, `duplicate-target`, `remove-target`
-- `add-dependency`
-
-### Build Configuration
-- `set-build-setting`, `get-build-settings`
-- `list-build-configs`
-
-### Dependencies
-- `add-framework`
-- `add-swift-package`, `remove-swift-package`, `list-swift-packages`
-
-### Project Structure
-- `create-groups`, `list-groups`
-- `list-files`, `list-targets`
-- `validate`
 
 ## Testing Guidelines
 
@@ -162,19 +200,6 @@ cd test && ./create_test_project.swift
 3. Return boolean for success/failure
 4. Ensure test is restorable (doesn't permanently modify test project)
 
-## Important Instructions for AI Agents
-
-### Critical Rules
-- **NEVER modify production projects without backups** - Always create `.backup` before changes
-- **NEVER create duplicate files** - No "Fixed", "New", "v2" suffixes. Fix files in place
-- **ALWAYS validate after bulk operations** - Run `validate` command after major changes
-- **ALWAYS use --project flag in examples** - Don't assume default project names
-
-### When Working with This Tool
-1. **Check current directory**: Ensure you're in the right location before running commands
-2. **Verify project exists**: Check for `.xcodeproj` file before attempting operations
-3. **Use proper escaping**: Quote file paths with spaces or special characters
-4. **Chain commands carefully**: Some operations depend on others (create group before adding files)
 
 ## Common Tasks
 
@@ -183,8 +208,8 @@ cd test && ./create_test_project.swift
 2. Implement handler function with proper error handling
 3. Add validation for required parameters
 4. Update help text with new command
-5. Add test coverage in TestSuite.swift
-6. Document in README.md and EXAMPLES.md
+5. Add test coverage in TestSuite.swift or suitable test file
+6. Document in README.md
 
 ### Debugging Issues
 - Use `print()` statements for debug output
@@ -280,5 +305,4 @@ ls -la *.xcodeproj.backup
 
 - **GitHub**: https://github.com/tolo/xcodeproj-cli
 - **Issues**: https://github.com/tolo/xcodeproj-cli/issues
-- **License**: MIT
 - **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for version history

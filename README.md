@@ -157,7 +157,7 @@ cd xcodeproj-cli
 
 ```bash
 # Create groups for organizing files (no filesystem folders created)
-./xcodeproj-cli.swift create-groups UI/Components UI/Screens Services/API
+./xcodeproj-cli.swift add-group UI/Components UI/Screens Services/API
 
 # List all groups in the project
 ./xcodeproj-cli.swift list-groups
@@ -257,6 +257,18 @@ cd xcodeproj-cli
 
 # List all files in the project
 ./xcodeproj-cli.swift list-files
+
+# Show complete project structure as tree with paths
+./xcodeproj-cli.swift list-tree
+# Output example:
+# MyProject
+# ├── Sources (Sources)
+# │   ├── Models (Sources/Models)
+# │   │   └── User.swift (Sources/Models/User.swift)
+# │   └── Views (UI/Views)
+# │       └── MainView.swift (UI/Views/MainView.swift)
+# └── Resources (Resources)
+#     └── Assets.xcassets (Resources/Assets.xcassets)
 ```
 
 ## Understanding Xcode Project Organization
@@ -270,11 +282,11 @@ Xcode has three distinct ways to organize and reference files in your project:
 - **Icon**: Yellow folder icon in Xcode
 - **Filesystem**: NO actual folders created on disk
 - **Use When**: You want to organize files in Xcode differently than on disk
-- **Commands**: `create-groups`, `remove-group`
+- **Commands**: `add-group` (creates empty groups), `remove-group` (removes any group type)
 
 ```bash
 # Create virtual organization structure
-./xcodeproj-cli.swift create-groups UI/Components UI/Screens
+./xcodeproj-cli.swift add-group UI/Components UI/Screens
 
 # Files can be in any disk location but appear organized in Xcode
 ./xcodeproj-cli.swift add-file random/path/Button.swift --group UI/Components --targets MyApp
@@ -285,7 +297,7 @@ Xcode has three distinct ways to organize and reference files in your project:
 - **Icon**: Blue folder icon in Xcode 16+ 
 - **Filesystem**: Directly linked to a real folder - changes auto-reflect
 - **Use When**: Resources/assets that change frequently outside Xcode
-- **Commands**: `add-sync-folder`
+- **Commands**: `add-sync-folder` (creates synced folders), `remove-group` (removes them)
 
 ```bash
 # Creates a synchronized folder reference (Xcode 16+)
@@ -294,11 +306,11 @@ Xcode has three distinct ways to organize and reference files in your project:
 ```
 
 #### 3️⃣ **Regular File/Folder Addition** - Individual File References
-- **What**: Adds files from a folder as individual references
-- **Icon**: Individual file icons in Xcode
-- **Filesystem**: Each file is tracked separately
+- **What**: Creates a group and adds files from a folder as individual references
+- **Icon**: Yellow folder group containing individual file icons in Xcode
+- **Filesystem**: Each file is tracked separately, group mirrors folder structure
 - **Use When**: Source code where you want control over what's included
-- **Commands**: `add-file`, `add-folder --recursive`
+- **Commands**: `add-folder` (creates group from folder), `remove-group` (removes it)
 
 ```bash
 # Adds each file from the folder individually
@@ -311,7 +323,7 @@ Xcode has three distinct ways to organize and reference files in your project:
 **Scenario 1: Organizing existing files**
 ```bash
 # Just create groups - no need to move files on disk
-./xcodeproj-cli.swift create-groups Architecture/MVVM/Models Architecture/MVVM/Views
+./xcodeproj-cli.swift add-group Architecture/MVVM/Models Architecture/MVVM/Views
 ./xcodeproj-cli.swift add-file Sources/User.swift --group Architecture/MVVM/Models --targets MyApp
 ```
 
@@ -366,7 +378,7 @@ validate                              # Check project health
 
 ```bash
 # Create the folder structure
-./xcodeproj-cli.swift create-groups \
+./xcodeproj-cli.swift add-group \
   Features/UserProfile \
   Features/UserProfile/Models \
   Features/UserProfile/Views \
@@ -442,6 +454,7 @@ done
 | `list-targets` | Show all targets in project | `list-targets` |
 | `list-groups` | Show project group hierarchy | `list-groups` |
 | `list-files` | Show files (all or in group) | `list-files [group-name]` |
+| `list-tree` | Show complete project tree with paths | `list-tree` |
 | `validate` | Check project integrity | `validate` |
 | `list-invalid-references` | Find broken file references | `list-invalid-references` |
 | `remove-invalid-references` | Clean up broken references | `remove-invalid-references` |
@@ -449,19 +462,19 @@ done
 ### 🗂️ Group Management
 | Command | Description | Example |
 |---------|-------------|---------|  
-| `create-groups` | Create virtual groups | `create-groups UI/Components Services/API` |
-| `remove-group` | Remove a group | `remove-group OldGroup` |
+| `add-group` | Add empty virtual groups | `add-group UI/Components Services/API` |
+| `remove-group` | Remove any group/folder type | `remove-group OldGroup` |
 
 ### 📁 File & Folder Management
 | Command | Description | Example |
 |---------|-------------|---------|
 | `add-file` | Add single file | `add-file Path/File.swift --group GroupName --targets Target1,Target2` |
 | `add-files` | Add multiple files | `add-files file1:group1 file2:group2 --targets Target` |
-| `add-folder` | Add folder contents as individual files | `add-folder Path/Folder --group GroupName --targets Target --recursive` |
+| `add-folder` | Create group from folder contents | `add-folder Path/Folder --group GroupName --targets Target --recursive` |
 | `add-sync-folder` | Add synced folder reference (Xcode 16+) | `add-sync-folder Path/Assets --group GroupName --targets Target` |
 | `move-file` | Move or rename file | `move-file old/path new/path` |
 | `remove-file` | Remove file from project | `remove-file Path/File.swift` |
-| `remove-folder` | Remove folder reference | `remove-folder Path/Folder` |
+| `remove-folder` | (Deprecated - use `remove-group`) | `remove-group Path/Folder` |
 
 ### 🎯 Target Operations
 | Command | Description | Example |
@@ -542,7 +555,7 @@ When creating targets, use these Apple product type identifiers:
   --targets MyApp,MyAppTests
 
 # Create a complete group structure at once
-./xcodeproj-cli.swift create-groups \
+./xcodeproj-cli.swift add-group \
   Features/Authentication \
   Features/Profile \
   Features/Settings \
@@ -581,7 +594,7 @@ When creating targets, use these Apple product type identifiers:
 **Example 3: Organizing an existing messy project**
 ```bash
 # Create a clean structure with groups (no files are moved on disk)
-./xcodeproj-cli.swift create-groups \
+./xcodeproj-cli.swift add-group \
   Architecture/Models \
   Architecture/Views \
   Architecture/ViewModels \
