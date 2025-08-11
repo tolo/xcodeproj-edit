@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `list-build-settings` command - Enhanced Xcode-style display of build settings with multiple output formats
+  - Setting-centric view (like Xcode) showing values across configurations
+  - `--json`/`-j` flag for JSON output suitable for automation
+  - `--all`/`-a` flag to display all project and target settings at once
+  - `--show-inherited`/`-i` flag to include inherited settings from project level
+  - `--target`/`-t` flag for consistency with other commands
+  - `--config`/`-c` flag to filter by specific configuration
+  - Inline display for uniform values, expanded view for configuration-specific values
+  - JSON output uses setting-centric structure for easier parsing
+  - Clear inheritance tracking showing which settings override project values
+
+### Changed
+- Improved error handling consistency across all commands (exit codes)
+- Enhanced error messages to include available options (e.g., list of valid targets)
+
+### Fixed
+- JSON error responses now properly structured with error details
+- Eliminated code duplication in build settings display logic (~150 lines reduced)
+- Fixed force unwrapping risks in configuration handling
+
+## [1.1.0] - 2025-08-11
+
+### Added
 - `list-tree` command - Display complete project structure as a tree with filesystem paths for actual files/folders
 - `add-group` command - Create empty virtual groups (renamed from `create-groups`)
 - `remove-invalid-references` command - Automatically clean up broken file and folder references
