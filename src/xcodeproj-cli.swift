@@ -1418,6 +1418,642 @@ class XcodeProjUtility {
     }
   }
 
+  // Enhanced list-build-settings command - Xcode-style output
+  func listBuildSettings(
+    targetName: String? = nil, configuration: String? = nil, showInherited: Bool = false,
+    outputJSON: Bool = false, showAll: Bool = false
+  ) {
+    if outputJSON {
+      listBuildSettingsJSON(
+        targetName: targetName, configuration: configuration,
+        showInherited: showInherited, showAll: showAll
+      )
+      return
+    }
+
+    if showAll {
+      listAllBuildSettings(configuration: configuration, showInherited: showInherited)
+      return
+    }
+    if let targetName = targetName {
+      // Target-level build settings with project inheritance info
+      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
+        let targetConfigList = target.buildConfigurationList
+      else {
+        print("⚠️  Target '\(targetName)' not found")
+        return
+      }
+
+      print("🎯 Build Settings for Target: \(targetName)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      // Get all configurations
+      let configs = targetConfigList.buildConfigurations
+      let configNames = configs.map { $0.name }
+
+      // Get project-level settings for comparison
+      let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+      // Collect all unique setting keys across all configurations
+      var allSettingKeys = Set<String>()
+      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+      var projectSettingsData: [String: [String: Any]] = [:]  // For inheritance tracking
+
+      for config in configs {
+        if let filterConfig = configuration, config.name != filterConfig {
+          continue
+        }
+
+        settingsData[config.name] = config.buildSettings
+        allSettingKeys.formUnion(config.buildSettings.keys)
+
+        // Get project settings for this config
+        if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+          $0.name == config.name
+        }) {
+          projectSettingsData[config.name] = projectConfig.buildSettings
+          if showInherited {
+            allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+          }
+        }
+      }
+
+      // Filter configs if specific configuration requested
+      let activeConfigs = configuration != nil ? [configuration!] : configNames
+
+      if allSettingKeys.isEmpty && !showInherited {
+        print("  (No explicit settings defined at target level)")
+        return
+      }
+
+      // Sort settings alphabetically
+      let sortedKeys = allSettingKeys.sorted()
+
+      // Display each setting with its values across configurations
+      for key in sortedKeys {
+        var hasTargetSetting = false
+        var isInheritedOnly = true
+        var values: [String: String] = [:]  // [ConfigName: FormattedValue]
+        var inheritedValues: [String: String] = [:]  // Project values for comparison
+
+        for configName in activeConfigs {
+          if let targetValue = settingsData[configName]?[key] {
+            hasTargetSetting = true
+            isInheritedOnly = false
+            values[configName] = formatBuildSettingValue(targetValue)
+          } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+            values[configName] = formatBuildSettingValue(projectValue)
+            inheritedValues[configName] = formatBuildSettingValue(projectValue)
+          }
+
+          // Track project values for override detection
+          if let projectValue = projectSettingsData[configName]?[key] {
+            let projectValueStr = formatBuildSettingValue(projectValue)
+            if inheritedValues[configName] == nil && values[configName] != projectValueStr {
+              inheritedValues[configName] = projectValueStr
+            }
+          }
+        }
+
+        if !hasTargetSetting && !showInherited {
+          continue  // Skip inherited-only settings if not showing inherited
+        }
+
+        // Check if all configs have the same value
+        let uniqueValues = Set(values.values)
+
+        if uniqueValues.count == 1, let singleValue = values.values.first {
+          // Same value across all configurations - display inline
+          if isInheritedOnly {
+            print("  \(key): \(singleValue) [inherited from project]")
+          } else {
+            print("  \(key): \(singleValue)")
+            // Show if it overrides a project setting
+            let uniqueInheritedValues = Set(inheritedValues.values)
+            if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
+              projectValue != singleValue
+            {
+              print("    ↳ overrides project: \(projectValue)")
+            }
+          }
+        } else {
+          // Different values per configuration - show on separate lines
+          print("  \(key)")
+          for configName in activeConfigs.sorted() {
+            if let value = values[configName] {
+              let isInherited = settingsData[configName]?[key] == nil && showInherited
+              let inheritedSuffix = isInherited ? " [inherited]" : ""
+              print("    \(configName): \(value)\(inheritedSuffix)")
+
+              // Show override info if applicable
+              if !isInherited, let projectValue = inheritedValues[configName], projectValue != value
+              {
+                print("      ↳ overrides project: \(projectValue)")
+              }
+            }
+          }
+        }
+      }
+
+      print("")
+    } else {
+      // Project-level build settings
+      guard let configList = pbxproj.rootObject?.buildConfigurationList else {
+        print("⚠️  No project build configuration found")
+        return
+      }
+
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print("🏗️  Build Settings for Project: \(projectName)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      // Get all configurations
+      let configs = configList.buildConfigurations
+      let configNames = configs.map { $0.name }
+
+      // Collect all unique setting keys across all configurations
+      var allSettingKeys = Set<String>()
+      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+
+      for config in configs {
+        if let filterConfig = configuration, config.name != filterConfig {
+          continue
+        }
+
+        settingsData[config.name] = config.buildSettings
+        allSettingKeys.formUnion(config.buildSettings.keys)
+      }
+
+      // Filter configs if specific configuration requested
+      let activeConfigs = configuration != nil ? [configuration!] : configNames
+
+      if allSettingKeys.isEmpty {
+        print("  (No explicit settings defined)")
+        return
+      }
+
+      // Sort settings alphabetically
+      let sortedKeys = allSettingKeys.sorted()
+
+      // Display each setting with its values across configurations
+      for key in sortedKeys {
+        var values: [String: String] = [:]  // [ConfigName: FormattedValue]
+
+        for configName in activeConfigs {
+          if let value = settingsData[configName]?[key] {
+            values[configName] = formatBuildSettingValue(value)
+          }
+        }
+
+        // Check if all configs have the same value
+        let uniqueValues = Set(values.values)
+
+        if uniqueValues.count == 1, let singleValue = values.values.first {
+          // Same value across all configurations - display inline
+          print("  \(key): \(singleValue)")
+        } else {
+          // Different values per configuration - show on separate lines
+          print("  \(key)")
+          for configName in activeConfigs.sorted() {
+            if let value = values[configName] {
+              print("    \(configName): \(value)")
+            }
+          }
+        }
+      }
+
+      print("")
+    }
+  }
+
+  private func formatBuildSettingValue(_ value: Any) -> String {
+    if let stringValue = value as? String {
+      return stringValue
+    } else if let arrayValue = value as? [String] {
+      return arrayValue.joined(separator: ", ")
+    } else {
+      return "\(value)"
+    }
+  }
+
+  // JSON output for list-build-settings
+  private func listBuildSettingsJSON(
+    targetName: String? = nil, configuration: String? = nil,
+    showInherited: Bool = false, showAll: Bool = false
+  ) {
+    var result: [String: Any] = [:]
+
+    if showAll {
+      // Include project and all targets
+      var allSettings: [String: Any] = [:]
+
+      // Project settings
+      if let configList = pbxproj.rootObject?.buildConfigurationList {
+        allSettings["project"] = collectBuildSettingsData(
+          configList: configList,
+          configuration: configuration
+        )
+      }
+
+      // All targets
+      var targetsSettings: [String: Any] = [:]
+      for target in pbxproj.nativeTargets {
+        if let configList = target.buildConfigurationList {
+          let targetData = collectTargetBuildSettingsData(
+            target: target,
+            configuration: configuration,
+            showInherited: showInherited
+          )
+          targetsSettings[target.name] = targetData
+        }
+      }
+      allSettings["targets"] = targetsSettings
+      result = allSettings
+
+    } else if let targetName = targetName {
+      // Specific target
+      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+        print("{}")
+        return
+      }
+
+      result = collectTargetBuildSettingsData(
+        target: target,
+        configuration: configuration,
+        showInherited: showInherited
+      )
+
+    } else {
+      // Project only
+      if let configList = pbxproj.rootObject?.buildConfigurationList {
+        result = collectBuildSettingsData(
+          configList: configList,
+          configuration: configuration
+        )
+      }
+    }
+
+    // Output JSON
+    if let jsonData = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted),
+      let jsonString = String(data: jsonData, encoding: .utf8)
+    {
+      print(jsonString)
+    } else {
+      print("{}")
+    }
+  }
+
+  // Helper to collect build settings data for JSON output (setting-centric)
+  private func collectBuildSettingsData(
+    configList: XCConfigurationList, configuration: String? = nil
+  ) -> [String: Any] {
+    var result: [String: Any] = [:]
+
+    // Collect all settings across configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+
+    for config in configList.buildConfigurations {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+    }
+
+    // Build setting-centric structure
+    for key in allSettingKeys {
+      var values: [String: Any] = [:]
+
+      for (configName, configSettings) in settingsData {
+        if let value = configSettings[key] {
+          values[configName] = formatBuildSettingValueForJSON(value)
+        }
+      }
+
+      // If all configs have the same value, simplify to just the value
+      let uniqueValues = Set(values.values.compactMap { "\($0)" })
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        result[key] = singleValue
+      } else {
+        result[key] = values
+      }
+    }
+
+    return result
+  }
+
+  // Helper to collect target build settings with inheritance info (setting-centric)
+  private func collectTargetBuildSettingsData(
+    target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
+  ) -> [String: Any] {
+    guard let targetConfigList = target.buildConfigurationList else {
+      return [:]
+    }
+
+    var result: [String: Any] = [:]
+    let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+    // Collect all settings across configurations
+    var allSettingKeys = Set<String>()
+    var targetSettingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
+    var projectSettingsData: [String: [String: Any]] = [:]  // For inheritance tracking
+
+    for config in targetConfigList.buildConfigurations {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      targetSettingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+
+      // Get project settings for this config if showing inherited
+      if showInherited {
+        if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+          $0.name == config.name
+        }) {
+          projectSettingsData[config.name] = projectConfig.buildSettings
+          allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+        }
+      }
+    }
+
+    // Build setting-centric structure
+    for key in allSettingKeys {
+      var values: [String: Any] = [:]
+      var sources: [String: String] = [:]  // Track source of each value
+      var hasTargetSetting = false
+
+      for configName in targetSettingsData.keys {
+        if let targetValue = targetSettingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValueForJSON(targetValue)
+          sources[configName] = "target"
+          hasTargetSetting = true
+        } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValueForJSON(projectValue)
+          sources[configName] = "project"
+        }
+      }
+
+      // Skip inherited-only settings if not showing inherited
+      if !hasTargetSetting && !showInherited {
+        continue
+      }
+
+      // If all configs have the same value and source, simplify
+      let uniqueValues = Set(values.values.compactMap { "\($0)" })
+      let uniqueSources = Set(sources.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        // All configs have same value
+        if showInherited && uniqueSources.count == 1, let source = sources.values.first {
+          // Include source info if showing inherited
+          result[key] = [
+            "value": singleValue,
+            "source": source,
+          ]
+        } else {
+          // Just the value if not showing inherited or all from target
+          result[key] = singleValue
+        }
+      } else {
+        // Different values per config
+        if showInherited {
+          // Include source info for each config
+          var configData: [String: Any] = [:]
+          for (configName, value) in values {
+            configData[configName] = [
+              "value": value,
+              "source": sources[configName] ?? "unknown",
+            ]
+          }
+          result[key] = configData
+        } else {
+          // Just values without source
+          result[key] = values
+        }
+      }
+    }
+
+    return result
+  }
+
+  // Format value for JSON output
+  private func formatBuildSettingValueForJSON(_ value: Any) -> Any {
+    if let arrayValue = value as? [String] {
+      return arrayValue
+    }
+    return formatBuildSettingValue(value)
+  }
+
+  // List all build settings (project + all targets)
+  private func listAllBuildSettings(configuration: String? = nil, showInherited: Bool = false) {
+    // Display settings directly for project
+    let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+    print("🏗️  Build Settings for Project: \(projectName)")
+    print("─" + String(repeating: "─", count: 80))
+    print("")
+
+    displayProjectBuildSettings(configuration: configuration)
+
+    // All targets
+    for target in pbxproj.nativeTargets {
+      print("")
+      print("🎯 Build Settings for Target: \(target.name)")
+      print("─" + String(repeating: "─", count: 80))
+      print("")
+
+      displayTargetBuildSettings(
+        target: target,
+        configuration: configuration,
+        showInherited: showInherited
+      )
+    }
+  }
+
+  // Helper to display project settings without header
+  private func displayProjectBuildSettings(configuration: String? = nil) {
+    guard let configList = pbxproj.rootObject?.buildConfigurationList else {
+      print("  (No project build configuration found)")
+      return
+    }
+
+    // Get all configurations
+    let configs = configList.buildConfigurations
+    let configNames = configs.map { $0.name }
+
+    // Collect all unique setting keys across all configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+    }
+
+    // Filter configs if specific configuration requested
+    let activeConfigs = configuration != nil ? [configuration!] : configNames
+
+    if allSettingKeys.isEmpty {
+      print("  (No explicit settings defined)")
+      return
+    }
+
+    // Sort settings alphabetically
+    let sortedKeys = allSettingKeys.sorted()
+
+    // Display each setting with its values across configurations
+    for key in sortedKeys {
+      var values: [String: String] = [:]
+
+      for configName in activeConfigs {
+        if let value = settingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValue(value)
+        }
+      }
+
+      // Check if all configs have the same value
+      let uniqueValues = Set(values.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        // Same value across all configurations - display inline
+        print("  \(key): \(singleValue)")
+      } else {
+        // Different values per configuration - show on separate lines
+        print("  \(key)")
+        for configName in activeConfigs.sorted() {
+          if let value = values[configName] {
+            print("    \(configName): \(value)")
+          }
+        }
+      }
+    }
+  }
+
+  // Helper to display target settings without header
+  private func displayTargetBuildSettings(
+    target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
+  ) {
+    guard let targetConfigList = target.buildConfigurationList else {
+      print("  (No build configuration found)")
+      return
+    }
+
+    // Get all configurations
+    let configs = targetConfigList.buildConfigurations
+    let configNames = configs.map { $0.name }
+
+    // Get project-level settings for comparison
+    let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+
+    // Collect all unique setting keys across all configurations
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+    var projectSettingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+
+      // Get project settings for this config
+      if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+        $0.name == config.name
+      }) {
+        projectSettingsData[config.name] = projectConfig.buildSettings
+        if showInherited {
+          allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+        }
+      }
+    }
+
+    // Filter configs if specific configuration requested
+    let activeConfigs = configuration != nil ? [configuration!] : configNames
+
+    if allSettingKeys.isEmpty && !showInherited {
+      print("  (No explicit settings defined at target level)")
+      return
+    }
+
+    // Sort settings alphabetically
+    let sortedKeys = allSettingKeys.sorted()
+
+    // Display each setting with its values across configurations
+    for key in sortedKeys {
+      var hasTargetSetting = false
+      var isInheritedOnly = true
+      var values: [String: String] = [:]
+      var inheritedValues: [String: String] = [:]
+
+      for configName in activeConfigs {
+        if let targetValue = settingsData[configName]?[key] {
+          hasTargetSetting = true
+          isInheritedOnly = false
+          values[configName] = formatBuildSettingValue(targetValue)
+        } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValue(projectValue)
+          inheritedValues[configName] = formatBuildSettingValue(projectValue)
+        }
+
+        // Track project values for override detection
+        if let projectValue = projectSettingsData[configName]?[key] {
+          let projectValueStr = formatBuildSettingValue(projectValue)
+          if inheritedValues[configName] == nil && values[configName] != projectValueStr {
+            inheritedValues[configName] = projectValueStr
+          }
+        }
+      }
+
+      if !hasTargetSetting && !showInherited {
+        continue  // Skip inherited-only settings if not showing inherited
+      }
+
+      // Check if all configs have the same value
+      let uniqueValues = Set(values.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        // Same value across all configurations - display inline
+        if isInheritedOnly {
+          print("  \(key): \(singleValue) [inherited from project]")
+        } else {
+          print("  \(key): \(singleValue)")
+          // Show if it overrides a project setting
+          let uniqueInheritedValues = Set(inheritedValues.values)
+          if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
+            projectValue != singleValue
+          {
+            print("    ↳ overrides project: \(projectValue)")
+          }
+        }
+      } else {
+        // Different values per configuration - show on separate lines
+        print("  \(key)")
+        for configName in activeConfigs.sorted() {
+          if let value = values[configName] {
+            let isInherited = settingsData[configName]?[key] == nil && showInherited
+            let inheritedSuffix = isInherited ? " [inherited]" : ""
+            print("    \(configName): \(value)\(inheritedSuffix)")
+
+            // Show override info if applicable
+            if !isInherited, let projectValue = inheritedValues[configName], projectValue != value {
+              print("      ↳ overrides project: \(projectValue)")
+            }
+          }
+        }
+      }
+    }
+  }
+
   // MARK: - Validation
   func validate() -> [String] {
     var issues: [String] = []
@@ -2136,6 +2772,22 @@ struct CLI {
           Display build settings for a target
           Example: get-build-settings MyApp --config Debug
           
+        list-build-settings [--target <target>] [--config <configuration>] [--show-inherited|-i] [--json|-j] [--all|-a]
+          List all build settings for a target or project
+          Without --target: shows project-level settings
+          With --target: shows target-level settings (and which override project settings)
+          --show-inherited|-i: also displays settings inherited from project level
+          --json|-j: output as JSON format
+          --all|-a: show settings for project and all targets
+          Examples: 
+            list-build-settings                                # Show project settings
+            list-build-settings --target MyApp                 # Show target settings
+            list-build-settings -t MyApp --config Debug        # Show Debug config only
+            list-build-settings -t MyApp --show-inherited      # Include inherited settings
+            list-build-settings --json                         # Output project settings as JSON
+            list-build-settings --all                          # Show all project and target settings
+            list-build-settings -a -j                          # All settings in JSON format
+          
         list-build-configs [--target <target-name>]
           List available build configurations (Debug, Release, etc.)
           
@@ -2469,6 +3121,18 @@ struct CLI {
           print("  \(key) = \(value)")
         }
       }
+      exit(0)
+
+    case "list-build-settings":
+      // Can be called without --target for project settings, or with --target for target settings
+      let targetName = parsedArgs.getFlag("--target", "-t")
+      let config = parsedArgs.getFlag("--config", "-c")
+      let showInherited = parsedArgs.hasFlag("--show-inherited", "-i")
+      let outputJSON = parsedArgs.hasFlag("--json", "-j")
+      let showAll = parsedArgs.hasFlag("--all", "-a")
+      utility.listBuildSettings(
+        targetName: targetName, configuration: config, showInherited: showInherited,
+        outputJSON: outputJSON, showAll: showAll)
       exit(0)
 
     case "list-build-configs":
