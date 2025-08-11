@@ -1832,9 +1832,59 @@ class XcodeProjUtility {
     if let rootGroup = pbxproj.rootObject?.mainGroup {
       let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
       print(projectName)
-      printTreeNode(rootGroup, prefix: "", isLast: true, parentPath: "")
+
+      // Process root group's children directly
+      let children = rootGroup.children
+      for (index, child) in children.enumerated() {
+        let childIsLast = (index == children.count - 1)
+        printTreeNode(child, prefix: "", isLast: childIsLast, parentPath: "")
+      }
     } else {
       print("❌ No project structure found")
+    }
+  }
+
+  func listGroupsTree() {
+    if let rootGroup = pbxproj.rootObject?.mainGroup {
+      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+      print(projectName)
+
+      // Process root group's children directly, showing only groups
+      let children = rootGroup.children
+      let groupChildren = children.filter {
+        $0 is PBXGroup || $0 is PBXFileSystemSynchronizedRootGroup
+      }
+
+      for (index, child) in groupChildren.enumerated() {
+        let childIsLast = (index == groupChildren.count - 1)
+        printGroupsOnly(child, prefix: "", isLast: childIsLast)
+      }
+    } else {
+      print("❌ No project structure found")
+    }
+  }
+
+  private func printGroupsOnly(_ element: PBXFileElement, prefix: String, isLast: Bool) {
+    let connector = isLast ? "└── " : "├── "
+    let continuation = isLast ? "    " : "│   "
+
+    // Only process groups
+    if let group = element as? PBXGroup {
+      let name = group.name ?? group.path ?? "unknown"
+      print("\(prefix)\(connector)\(name)")
+
+      // Filter children to show only groups
+      let groupChildren = group.children.filter {
+        $0 is PBXGroup || $0 is PBXFileSystemSynchronizedRootGroup
+      }
+
+      for (index, child) in groupChildren.enumerated() {
+        let childIsLast = (index == groupChildren.count - 1)
+        printGroupsOnly(child, prefix: prefix + continuation, isLast: childIsLast)
+      }
+    } else if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
+      let name = syncGroup.name ?? syncGroup.path ?? "unknown"
+      print("\(prefix)\(connector)\(name) [synchronized]")
     }
   }
 
@@ -1844,26 +1894,74 @@ class XcodeProjUtility {
     let connector = isLast ? "└── " : "├── "
     let continuation = isLast ? "    " : "│   "
 
-    // Get display name and path
+    // Get display name
     let name = element.name ?? element.path ?? "unknown"
-    let elementPath = element.path ?? element.name ?? ""
 
-    // Build full path
-    let fullPath: String
-    if parentPath.isEmpty {
-      fullPath = elementPath
-    } else if elementPath.isEmpty {
-      fullPath = parentPath
+    // Determine if this is an actual file/folder reference or a virtual group
+    let isFileReference = element is PBXFileReference
+    let isSyncFolder = element is PBXFileSystemSynchronizedRootGroup
+
+    // For actual file/folder references, show the path
+    if isFileReference {
+      if let fileRef = element as? PBXFileReference {
+        // Build the full path for file references
+        let elementPath = fileRef.path ?? fileRef.name ?? ""
+        let fullPath: String
+        if parentPath.isEmpty {
+          fullPath = elementPath
+        } else if elementPath.isEmpty {
+          fullPath = parentPath
+        } else {
+          fullPath = "\(parentPath)/\(elementPath)"
+        }
+
+        // Check if it's a folder reference (blue folder in Xcode)
+        let isFolderRef =
+          fileRef.lastKnownFileType == "folder"
+          || fileRef.lastKnownFileType == "folder.assetcatalog"
+          || fileRef.lastKnownFileType == "wrapper.framework"
+
+        if isFolderRef {
+          print("\(prefix)\(connector)\(name) (\(fullPath)) [folder reference]")
+        } else {
+          print("\(prefix)\(connector)\(name) (\(fullPath))")
+        }
+      }
+    } else if isSyncFolder {
+      // Synchronized folders (Xcode 16+)
+      if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
+        let elementPath = syncGroup.path ?? syncGroup.name ?? ""
+        let fullPath: String
+        if parentPath.isEmpty {
+          fullPath = elementPath
+        } else if elementPath.isEmpty {
+          fullPath = parentPath
+        } else {
+          fullPath = "\(parentPath)/\(elementPath)"
+        }
+        print("\(prefix)\(connector)\(name) (\(fullPath)) [synchronized]")
+      }
     } else {
-      fullPath = "\(parentPath)/\(elementPath)"
+      // Virtual groups - just show the name without path
+      print("\(prefix)\(connector)\(name)")
     }
 
-    // Print with format: Name (path)
-    if !elementPath.isEmpty {
-      print("\(prefix)\(connector)\(name) (\(fullPath))")
-    } else if element.name != nil {
-      // For groups with only a name but no path
-      print("\(prefix)\(connector)\(name)")
+    // Build path for children (considering virtual groups)
+    let childPath: String
+    if let group = element as? PBXGroup {
+      // For virtual groups, keep the parent path
+      // For groups with a path, append it
+      if let groupPath = group.path, !groupPath.isEmpty {
+        childPath = parentPath.isEmpty ? groupPath : "\(parentPath)/\(groupPath)"
+      } else {
+        childPath = parentPath
+      }
+    } else if isFileReference {
+      // File references don't have children, but just in case
+      let elementPath = element.path ?? element.name ?? ""
+      childPath = parentPath.isEmpty ? elementPath : "\(parentPath)/\(elementPath)"
+    } else {
+      childPath = parentPath
     }
 
     // Recurse for groups
@@ -1872,11 +1970,8 @@ class XcodeProjUtility {
       for (index, child) in children.enumerated() {
         let childIsLast = (index == children.count - 1)
         printTreeNode(
-          child, prefix: prefix + continuation, isLast: childIsLast, parentPath: fullPath)
+          child, prefix: prefix + continuation, isLast: childIsLast, parentPath: childPath)
       }
-    } else if let syncGroup = element as? PBXFileSystemSynchronizedRootGroup {
-      // Handle synchronized folders (Xcode 16+)
-      print("\(prefix)\(continuation)[synchronized folder]")
     }
   }
 
@@ -2064,16 +2159,18 @@ struct CLI {
           Show all targets in the project with their types
           
         list-files [group-name]
-          Show files in entire project or specific group
+          Show files in entire project or specific group (flat list)
           Example: list-files
           Example: list-files Sources/Models
+          Note: Consider using 'list-tree' for better visualization
           
         list-groups
-          Show the group hierarchy in the project navigator
+          Show group hierarchy in tree format (no files)
+          Note: Consider using 'list-tree' to also see files
           
         list-tree
-          Show complete project structure as a tree with filesystem paths
-          Displays both groups and files with their paths in parentheses
+          Show complete project structure as a tree (RECOMMENDED)
+          Virtual groups shown as names only, files/folders show paths in parentheses
           
         list-invalid-references
           Find all broken file references (files that don't exist)
@@ -2380,13 +2477,7 @@ struct CLI {
       exit(0)
 
     case "list-groups":
-      print("📁 Groups in project:")
-      for group in utility.pbxproj.groups {
-        if let name = group.name ?? group.path {
-          print("  - \(name)")
-          listGroupHierarchy(group, indent: "    ")
-        }
-      }
+      utility.listGroupsTree()
       exit(0)
 
     case "add-group", "create-groups":  // create-groups kept for backward compatibility
@@ -2479,16 +2570,6 @@ struct CLI {
     }
   }
 
-  static func listGroupHierarchy(_ group: PBXGroup, indent: String = "") {
-    for child in group.children {
-      if let subgroup = child as? PBXGroup {
-        if let name = subgroup.name ?? subgroup.path {
-          print("\(indent)- \(name)")
-          listGroupHierarchy(subgroup, indent: indent + "  ")
-        }
-      }
-    }
-  }
 }
 
 // MARK: - Main

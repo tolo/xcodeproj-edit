@@ -5,6 +5,29 @@ All notable changes to xcodeproj-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `list-tree` command - Display complete project structure as a tree with filesystem paths for actual files/folders
+- `add-group` command - Create empty virtual groups (renamed from `create-groups`)
+- `remove-invalid-references` command - Automatically clean up broken file and folder references
+- Enhanced test coverage for invalid references operations
+- Improved test coverage for group operations
+- Auto discovery of project file in current directory
+
+### Changed
+- `list-groups` command now uses tree-style formatting with box-drawing characters (├──, └──, │)
+- `list-tree` intelligently shows paths only for actual file/folder references, not virtual groups
+- `create-groups` command renamed to `add-group` for consistency
+- `remove-folder` command deprecated in favor of `remove-group` (handles all group types)
+- Improved documentation for groups vs folders vs file references
+- Enhanced README with clearer explanations of Xcode project organization
+- Promoted `list-tree` as the recommended command for viewing project structure
+
+### Fixed
+- Invalid folder references detection and removal
+- Test suite compatibility improvements
+
 ## [1.0.0] - 2025-08-09
 
 ### 🎉 Initial Release

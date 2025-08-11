@@ -159,11 +159,18 @@ cd xcodeproj-cli
 # Create groups for organizing files (no filesystem folders created)
 ./xcodeproj-cli.swift add-group UI/Components UI/Screens Services/API
 
-# List all groups in the project
-./xcodeproj-cli.swift list-groups
+# Show complete project structure (RECOMMENDED)
+./xcodeproj-cli.swift list-tree
 
-# List files in a specific group
-./xcodeproj-cli.swift list-files UI/Components
+# List groups only in tree format (no files)
+./xcodeproj-cli.swift list-groups
+# Output:
+# MyProject
+# ├── Sources
+# ├── Resources
+# └── Features
+#     ├── Login
+#     └── Profile
 
 # Remove a group (files remain in project)
 ./xcodeproj-cli.swift remove-group UI/OldComponents
@@ -255,19 +262,17 @@ cd xcodeproj-cli
 ./xcodeproj-cli.swift list-invalid-references
 ./xcodeproj-cli.swift remove-invalid-references
 
-# List all files in the project
-./xcodeproj-cli.swift list-files
-
-# Show complete project structure as tree with paths
+# Show complete project structure (recommended)
+# Virtual groups shown without paths, actual files/folders with paths
 ./xcodeproj-cli.swift list-tree
 # Output example:
 # MyProject
-# ├── Sources (Sources)
-# │   ├── Models (Sources/Models)
+# ├── Sources              <- Virtual group (no path)
+# │   ├── Models           <- Virtual group
 # │   │   └── User.swift (Sources/Models/User.swift)
-# │   └── Views (UI/Views)
+# │   └── Views            <- Virtual group  
 # │       └── MainView.swift (UI/Views/MainView.swift)
-# └── Resources (Resources)
+# └── Resources            <- Virtual group
 #     └── Assets.xcassets (Resources/Assets.xcassets)
 ```
 
@@ -451,10 +456,10 @@ done
 ### 📂 Project Inspection
 | Command | Description | Example |
 |---------|-------------|---------|
+| `list-tree` | **Show complete project tree** (recommended) | `list-tree` |
 | `list-targets` | Show all targets in project | `list-targets` |
-| `list-groups` | Show project group hierarchy | `list-groups` |
-| `list-files` | Show files (all or in group) | `list-files [group-name]` |
-| `list-tree` | Show complete project tree with paths | `list-tree` |
+| `list-files` | Show files only (flat list) | `list-files [group-name]` |
+| `list-groups` | Show groups in tree format (no files) | `list-groups` |
 | `validate` | Check project integrity | `validate` |
 | `list-invalid-references` | Find broken file references | `list-invalid-references` |
 | `remove-invalid-references` | Clean up broken references | `remove-invalid-references` |
