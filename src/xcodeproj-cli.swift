@@ -1441,7 +1441,8 @@ class XcodeProjUtility {
         let targetConfigList = target.buildConfigurationList
       else {
         print("⚠️  Target '\(targetName)' not found")
-        return
+        print("Available targets: \(pbxproj.nativeTargets.map { $0.name }.joined(separator: ", "))")
+        exit(1)
       }
 
       print("🎯 Build Settings for Target: \(targetName)")
@@ -1480,7 +1481,12 @@ class XcodeProjUtility {
       }
 
       // Filter configs if specific configuration requested
-      let activeConfigs = configuration != nil ? [configuration!] : configNames
+      let activeConfigs: [String]
+      if let config = configuration {
+        activeConfigs = [config]
+      } else {
+        activeConfigs = configNames
+      }
 
       if allSettingKeys.isEmpty && !showInherited {
         print("  (No explicit settings defined at target level)")
@@ -1492,68 +1498,27 @@ class XcodeProjUtility {
 
       // Display each setting with its values across configurations
       for key in sortedKeys {
-        var hasTargetSetting = false
-        var isInheritedOnly = true
-        var values: [String: String] = [:]  // [ConfigName: FormattedValue]
-        var inheritedValues: [String: String] = [:]  // Project values for comparison
-
-        for configName in activeConfigs {
-          if let targetValue = settingsData[configName]?[key] {
-            hasTargetSetting = true
-            isInheritedOnly = false
-            values[configName] = formatBuildSettingValue(targetValue)
-          } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
-            values[configName] = formatBuildSettingValue(projectValue)
-            inheritedValues[configName] = formatBuildSettingValue(projectValue)
-          }
-
-          // Track project values for override detection
-          if let projectValue = projectSettingsData[configName]?[key] {
-            let projectValueStr = formatBuildSettingValue(projectValue)
-            if inheritedValues[configName] == nil && values[configName] != projectValueStr {
-              inheritedValues[configName] = projectValueStr
-            }
-          }
-        }
+        let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
+          key: key,
+          activeConfigs: activeConfigs,
+          settingsData: settingsData,
+          projectSettingsData: projectSettingsData,
+          showInherited: showInherited
+        )
 
         if !hasTargetSetting && !showInherited {
           continue  // Skip inherited-only settings if not showing inherited
         }
 
-        // Check if all configs have the same value
-        let uniqueValues = Set(values.values)
-
-        if uniqueValues.count == 1, let singleValue = values.values.first {
-          // Same value across all configurations - display inline
-          if isInheritedOnly {
-            print("  \(key): \(singleValue) [inherited from project]")
-          } else {
-            print("  \(key): \(singleValue)")
-            // Show if it overrides a project setting
-            let uniqueInheritedValues = Set(inheritedValues.values)
-            if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
-              projectValue != singleValue
-            {
-              print("    ↳ overrides project: \(projectValue)")
-            }
-          }
-        } else {
-          // Different values per configuration - show on separate lines
-          print("  \(key)")
-          for configName in activeConfigs.sorted() {
-            if let value = values[configName] {
-              let isInherited = settingsData[configName]?[key] == nil && showInherited
-              let inheritedSuffix = isInherited ? " [inherited]" : ""
-              print("    \(configName): \(value)\(inheritedSuffix)")
-
-              // Show override info if applicable
-              if !isInherited, let projectValue = inheritedValues[configName], projectValue != value
-              {
-                print("      ↳ overrides project: \(projectValue)")
-              }
-            }
-          }
-        }
+        displaySettingValues(
+          key: key,
+          values: values,
+          inheritedValues: inheritedValues,
+          isInheritedOnly: isInheritedOnly,
+          activeConfigs: activeConfigs,
+          settingsData: settingsData,
+          showInherited: showInherited
+        )
       }
 
       print("")
@@ -1561,7 +1526,7 @@ class XcodeProjUtility {
       // Project-level build settings
       guard let configList = pbxproj.rootObject?.buildConfigurationList else {
         print("⚠️  No project build configuration found")
-        return
+        exit(1)
       }
 
       let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
@@ -1587,7 +1552,12 @@ class XcodeProjUtility {
       }
 
       // Filter configs if specific configuration requested
-      let activeConfigs = configuration != nil ? [configuration!] : configNames
+      let activeConfigs: [String]
+      if let config = configuration {
+        activeConfigs = [config]
+      } else {
+        activeConfigs = configNames
+      }
 
       if allSettingKeys.isEmpty {
         print("  (No explicit settings defined)")
@@ -1638,6 +1608,89 @@ class XcodeProjUtility {
     }
   }
 
+  // Common helper to display a setting with its values across configurations
+  private func displaySettingValues(
+    key: String,
+    values: [String: String],
+    inheritedValues: [String: String],
+    isInheritedOnly: Bool,
+    activeConfigs: [String],
+    settingsData: [String: [String: Any]],
+    showInherited: Bool
+  ) {
+    // Check if all configs have the same value
+    let uniqueValues = Set(values.values)
+
+    if uniqueValues.count == 1, let singleValue = values.values.first {
+      // Same value across all configurations - display inline
+      if isInheritedOnly {
+        print("  \(key): \(singleValue) [inherited from project]")
+      } else {
+        print("  \(key): \(singleValue)")
+        // Show if it overrides a project setting
+        let uniqueInheritedValues = Set(inheritedValues.values)
+        if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
+          projectValue != singleValue
+        {
+          print("    ↳ overrides project: \(projectValue)")
+        }
+      }
+    } else {
+      // Different values per configuration - show on separate lines
+      print("  \(key)")
+      for configName in activeConfigs.sorted() {
+        if let value = values[configName] {
+          let isInherited = settingsData[configName]?[key] == nil && showInherited
+          let inheritedSuffix = isInherited ? " [inherited]" : ""
+          print("    \(configName): \(value)\(inheritedSuffix)")
+
+          // Show override info if applicable
+          if !isInherited, let projectValue = inheritedValues[configName], projectValue != value {
+            print("      ↳ overrides project: \(projectValue)")
+          }
+        }
+      }
+    }
+  }
+
+  // Helper to collect setting values across configurations
+  private func collectSettingValues(
+    key: String,
+    activeConfigs: [String],
+    settingsData: [String: [String: Any]],
+    projectSettingsData: [String: [String: Any]],
+    showInherited: Bool
+  ) -> (
+    values: [String: String], inheritedValues: [String: String], hasTargetSetting: Bool,
+    isInheritedOnly: Bool
+  ) {
+    var hasTargetSetting = false
+    var isInheritedOnly = true
+    var values: [String: String] = [:]
+    var inheritedValues: [String: String] = [:]
+
+    for configName in activeConfigs {
+      if let targetValue = settingsData[configName]?[key] {
+        hasTargetSetting = true
+        isInheritedOnly = false
+        values[configName] = formatBuildSettingValue(targetValue)
+      } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
+        values[configName] = formatBuildSettingValue(projectValue)
+        inheritedValues[configName] = formatBuildSettingValue(projectValue)
+      }
+
+      // Track project values for override detection
+      if let projectValue = projectSettingsData[configName]?[key] {
+        let projectValueStr = formatBuildSettingValue(projectValue)
+        if inheritedValues[configName] == nil && values[configName] != projectValueStr {
+          inheritedValues[configName] = projectValueStr
+        }
+      }
+    }
+
+    return (values, inheritedValues, hasTargetSetting, isInheritedOnly)
+  }
+
   // JSON output for list-build-settings
   private func listBuildSettingsJSON(
     targetName: String? = nil, configuration: String? = nil,
@@ -1675,8 +1728,20 @@ class XcodeProjUtility {
     } else if let targetName = targetName {
       // Specific target
       guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
-        print("{}")
-        return
+        let errorDict =
+          [
+            "error": "Target '\(targetName)' not found",
+            "availableTargets": pbxproj.nativeTargets.map { $0.name },
+          ] as [String: Any]
+        if let jsonData = try? JSONSerialization.data(
+          withJSONObject: errorDict, options: .prettyPrinted),
+          let jsonString = String(data: jsonData, encoding: .utf8)
+        {
+          print(jsonString)
+        } else {
+          print("{\"error\": \"Target '\(targetName)' not found\"}")
+        }
+        exit(1)
       }
 
       result = collectTargetBuildSettingsData(
@@ -1978,7 +2043,12 @@ class XcodeProjUtility {
     }
 
     // Filter configs if specific configuration requested
-    let activeConfigs = configuration != nil ? [configuration!] : configNames
+    let activeConfigs: [String]
+    if let config = configuration {
+      activeConfigs = [config]
+    } else {
+      activeConfigs = configNames
+    }
 
     if allSettingKeys.isEmpty && !showInherited {
       print("  (No explicit settings defined at target level)")
@@ -1990,67 +2060,27 @@ class XcodeProjUtility {
 
     // Display each setting with its values across configurations
     for key in sortedKeys {
-      var hasTargetSetting = false
-      var isInheritedOnly = true
-      var values: [String: String] = [:]
-      var inheritedValues: [String: String] = [:]
-
-      for configName in activeConfigs {
-        if let targetValue = settingsData[configName]?[key] {
-          hasTargetSetting = true
-          isInheritedOnly = false
-          values[configName] = formatBuildSettingValue(targetValue)
-        } else if showInherited, let projectValue = projectSettingsData[configName]?[key] {
-          values[configName] = formatBuildSettingValue(projectValue)
-          inheritedValues[configName] = formatBuildSettingValue(projectValue)
-        }
-
-        // Track project values for override detection
-        if let projectValue = projectSettingsData[configName]?[key] {
-          let projectValueStr = formatBuildSettingValue(projectValue)
-          if inheritedValues[configName] == nil && values[configName] != projectValueStr {
-            inheritedValues[configName] = projectValueStr
-          }
-        }
-      }
+      let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
+        key: key,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        projectSettingsData: projectSettingsData,
+        showInherited: showInherited
+      )
 
       if !hasTargetSetting && !showInherited {
         continue  // Skip inherited-only settings if not showing inherited
       }
 
-      // Check if all configs have the same value
-      let uniqueValues = Set(values.values)
-
-      if uniqueValues.count == 1, let singleValue = values.values.first {
-        // Same value across all configurations - display inline
-        if isInheritedOnly {
-          print("  \(key): \(singleValue) [inherited from project]")
-        } else {
-          print("  \(key): \(singleValue)")
-          // Show if it overrides a project setting
-          let uniqueInheritedValues = Set(inheritedValues.values)
-          if uniqueInheritedValues.count == 1, let projectValue = inheritedValues.values.first,
-            projectValue != singleValue
-          {
-            print("    ↳ overrides project: \(projectValue)")
-          }
-        }
-      } else {
-        // Different values per configuration - show on separate lines
-        print("  \(key)")
-        for configName in activeConfigs.sorted() {
-          if let value = values[configName] {
-            let isInherited = settingsData[configName]?[key] == nil && showInherited
-            let inheritedSuffix = isInherited ? " [inherited]" : ""
-            print("    \(configName): \(value)\(inheritedSuffix)")
-
-            // Show override info if applicable
-            if !isInherited, let projectValue = inheritedValues[configName], projectValue != value {
-              print("      ↳ overrides project: \(projectValue)")
-            }
-          }
-        }
-      }
+      displaySettingValues(
+        key: key,
+        values: values,
+        inheritedValues: inheritedValues,
+        isInheritedOnly: isInheritedOnly,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        showInherited: showInherited
+      )
     }
   }
 
