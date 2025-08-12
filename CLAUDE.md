@@ -18,7 +18,7 @@ xcodeproj-cli is a powerful command-line utility for programmatically manipulati
 ## Key Technologies
 
 - **Swift 5.0+** - Core implementation language
-- **swift-sh** - Swift script dependency management
+- **Swift Package Manager** - Dependency management and build system
 - **XcodeProj Library** (tuist/XcodeProj v9.4.3+) - Core .xcodeproj manipulation
 - **PathKit** - Swift path manipulation library
 - **macOS 10.15+** - Required platform
@@ -27,7 +27,7 @@ xcodeproj-cli is a powerful command-line utility for programmatically manipulati
 
 ```bash
 # Always specify project (default: MyProject.xcodeproj)
-./xcodeproj-cli.swift --project App.xcodeproj <command>
+xcodeproj-cli --project App.xcodeproj <command>
 
 # Most common operations
 add-file File.swift Group Target        # Add single file
@@ -42,8 +42,14 @@ validate                              # Check project integrity
 ### Project Structure
 ```
 xcodeproj-cli/
-├── src/
-│   └── xcodeproj-cli.swift        # Main tool implementation (30+ commands)
+├── Sources/
+│   └── xcodeproj-cli/
+│       └── main.swift              # Main tool implementation (30+ commands)
+├── Package.swift                   # Swift Package Manager configuration
+├── build-universal.sh              # Universal binary build script
+├── .github/
+│   └── workflows/
+│       └── release.yml             # Automated release workflow
 ├── test/
 │   ├── TestSuite.swift            # Main Swift test suite
 │   ├── TestRunner.swift           # Test runner utility
@@ -222,7 +228,7 @@ cd test && ./create_test_project.swift
 ## Performance Considerations
 
 - File operations are batched when possible
-- swift-sh caches dependencies after first run
+- Swift Package Manager caches dependencies after first build
 - Group lookups are recursive but typically fast
 - Large projects (1000+ files) may need optimization
 
@@ -230,16 +236,10 @@ cd test && ./create_test_project.swift
 
 ### Common Issues and Solutions
 
-**"swift-sh not found"**
-```bash
-# Install via Homebrew
-brew install swift-sh
-```
-
 **"Permission denied" when running tool**
 ```bash
 # Make executable
-chmod +x xcodeproj-cli.swift
+chmod +x xcodeproj-cli
 ```
 
 **"File already exists" errors**
@@ -259,8 +259,9 @@ chmod +x xcodeproj-cli.swift
 
 **XcodeProj dependency errors**
 ```bash
-# Clear cache and retry
-rm -rf ~/Library/Developer/swift-sh.cache
+# Clear SPM cache and retry
+rm -rf .build
+swift build -c release
 ```
 
 **Project corruption after operations**
@@ -297,9 +298,125 @@ ls -la *.xcodeproj.backup
 ## Useful Resources
 
 - [XcodeProj Documentation](https://github.com/tuist/XcodeProj)
-- [swift-sh Documentation](https://github.com/mxcl/swift-sh)
+- [Swift Package Manager Documentation](https://swift.org/package-manager/)
 - [Xcode Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference)
 - [Swift Package Manager](https://swift.org/package-manager/)
+
+## Release Preparation Procedures
+
+### Pre-Release Checklist
+
+Before creating a release, **ALWAYS** complete these steps:
+
+#### 1. Build Verification
+```bash
+# Clean build directory
+rm -rf .build
+
+# Build release version
+swift build -c release
+
+# Test the binary works
+.build/release/xcodeproj-cli --version
+.build/release/xcodeproj-cli --help
+
+# Build universal binary
+./build-universal.sh
+
+# Verify universal binary architectures
+lipo -info xcodeproj-cli
+# Expected output: "Architectures in the fat file: xcodeproj-cli are: x86_64 arm64"
+
+# Test universal binary
+./xcodeproj-cli --version
+```
+
+#### 2. Test Suite Execution
+```bash
+# Run test suite (when available)
+swift test
+
+# Run manual smoke tests
+./xcodeproj-cli --project test/TestData/TestProject.xcodeproj list-targets
+./xcodeproj-cli --project test/TestData/TestProject.xcodeproj validate
+```
+
+#### 3. GitHub Actions Release Workflow Testing
+```bash
+# Test the release workflow locally using act (if installed)
+# Install act: brew install act
+act -n -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest \
+    --secret GITHUB_TOKEN=$GITHUB_TOKEN \
+    -W .github/workflows/release.yml
+
+# Or manually verify the workflow file
+cat .github/workflows/release.yml | grep -E "swift build|lipo|tar|shasum"
+```
+
+#### 4. Version Consistency Check
+```bash
+# Ensure version is updated in all locations:
+grep -n "version.*=.*\"" Sources/xcodeproj-cli/main.swift
+grep "## \[" CHANGELOG.md | head -1
+# Both should show the same version number
+```
+
+#### 5. Documentation Review
+- Ensure README.md is up to date with any new features
+- Update CHANGELOG.md with all changes for the release
+- Verify installation instructions still work
+
+### Release Process
+
+1. **Update Version**
+   ```bash
+   # Update version in Sources/xcodeproj-cli/main.swift
+   # Update CHANGELOG.md with release date
+   ```
+
+2. **Final Build Test**
+   ```bash
+   swift build -c release
+   ./build-universal.sh
+   ```
+
+3. **Commit Changes**
+   ```bash
+   git add -A
+   git commit -m "Release v2.0.0"
+   git push origin main
+   ```
+
+4. **Create Release Tag**
+   ```bash
+   git tag v2.0.0
+   git push origin v2.0.0
+   ```
+
+5. **Monitor GitHub Actions**
+   - Watch the release workflow at: https://github.com/tolo/xcodeproj-cli/actions
+   - Verify the release was created with binary attached
+   - Check the SHA256 hash in the workflow output
+
+6. **Update Homebrew Formula**
+   - Copy SHA256 from GitHub Actions output
+   - Update formula in homebrew-xcodeproj repository
+   - Test installation: `brew upgrade xcodeproj-cli`
+
+### Post-Release Verification
+
+```bash
+# Test Homebrew installation
+brew update
+brew upgrade xcodeproj-cli
+xcodeproj-cli --version  # Should show new version
+
+# Test direct binary download
+curl -L "https://github.com/tolo/xcodeproj-cli/releases/latest/download/xcodeproj-cli-v2.0.0-macos.tar.gz" -o test.tar.gz
+tar -xzf test.tar.gz
+./xcodeproj-cli --version
+rm test.tar.gz xcodeproj-cli
+```
 
 ## Repository
 

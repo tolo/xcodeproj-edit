@@ -1,5 +1,5 @@
 // XcodeProj CLI - Comprehensive Xcode Project Manipulation Utility
-// Version: 1.1.0
+// Version: 2.0.0
 // License: MIT
 //
 // A powerful command-line tool for programmatically manipulating Xcode project files
@@ -2683,7 +2683,7 @@ class XcodeProjUtility {
 
 // MARK: - Command Line Interface
 struct CLI {
-  static let version = "1.0.0"
+  static let version = "2.0.0"
 
   static func printUsage() {
     print(
@@ -2691,7 +2691,7 @@ struct CLI {
       XcodeProj CLI v\(version)
       A powerful command-line tool for Xcode project manipulation
 
-      Usage: xcodeproj-cli.swift [--project <path>] <command> [options]
+      Usage: xcodeproj-cli [--project <path>] <command> [options]
 
       Options:
         --project <path>  Path to .xcodeproj file (default: looks for *.xcodeproj in current directory)
@@ -2864,26 +2864,26 @@ struct CLI {
       COMMON WORKFLOWS:
 
         # Adding files to your project:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-file NewFeature.swift --group Features --targets MyApp
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-folder Sources/Features --group Features --targets MyApp --recursive
+        xcodeproj-cli --project MyApp.xcodeproj add-file NewFeature.swift --group Features --targets MyApp
+        xcodeproj-cli --project MyApp.xcodeproj add-folder Sources/Features --group Features --targets MyApp --recursive
         
         # Cleaning up the project:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj list-invalid-references
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-invalid-references
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj validate
+        xcodeproj-cli --project MyApp.xcodeproj list-invalid-references
+        xcodeproj-cli --project MyApp.xcodeproj remove-invalid-references
+        xcodeproj-cli --project MyApp.xcodeproj validate
         
         # Managing dependencies:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-swift-package https://github.com/Alamofire/Alamofire --requirement "from: 5.0.0" --target MyApp
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-framework CoreML --target MyApp
+        xcodeproj-cli --project MyApp.xcodeproj add-swift-package https://github.com/Alamofire/Alamofire --requirement "from: 5.0.0" --target MyApp
+        xcodeproj-cli --project MyApp.xcodeproj add-framework CoreML --target MyApp
         
         # Working with targets:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj list-targets
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj duplicate-target MyApp MyAppPro --bundle-id com.example.pro
+        xcodeproj-cli --project MyApp.xcodeproj list-targets
+        xcodeproj-cli --project MyApp.xcodeproj duplicate-target MyApp MyAppPro --bundle-id com.example.pro
         
         # Reorganizing files:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-group Features/Login Features/Profile Utils
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj move-file OldName.swift NewName.swift
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-group OldFeatures
+        xcodeproj-cli --project MyApp.xcodeproj add-group Features/Login Features/Profile Utils
+        xcodeproj-cli --project MyApp.xcodeproj move-file OldName.swift NewName.swift
+        xcodeproj-cli --project MyApp.xcodeproj remove-group OldFeatures
       """)
   }
 

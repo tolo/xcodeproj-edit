@@ -1,5 +1,7 @@
 # XcodeProj CLI
 
+**⚠️ Version 2.0 Breaking Change**: The Swift script version has been removed. xcodeproj-cli is now distributed as a compiled binary only.
+
 A powerful command-line utility for manipulating Xcode project files (.xcodeproj) without requiring Xcode or Docker. Designed for both **human developers** and **AI coding assistants** (like Claude Code, GitHub Copilot, and other LLM-based tools) to automate Xcode project management.
 
 ## Acknowledgments
@@ -53,8 +55,7 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 
 ### Prerequisites
 - macOS 10.15+ (Catalina or later)
-- For Homebrew installation: No additional dependencies
-- For Swift script installation: Swift 5.0+ and [swift-sh](https://github.com/mxcl/swift-sh)
+- No additional dependencies required
 
 ### Installation
 
@@ -75,15 +76,14 @@ xcodeproj-cli --help
 xcodeproj-cli --project MyApp.xcodeproj list-targets
 ```
 
-#### Interactive Installer
-Choose between Homebrew or Swift script installation:
+#### Quick Install Script
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/tolo/xcodeproj-cli/main/install.sh)"
 ```
 
 This installer will:
-- Let you choose between Homebrew (binary) or Swift script installation
-- Handle all dependencies automatically
+- Install via Homebrew if available
+- Or download the binary directly
 - Set up the tool for immediate use
 
 #### Manual Binary Install
@@ -101,34 +101,18 @@ sudo mv xcodeproj-cli /usr/local/bin/
 chmod +x /usr/local/bin/xcodeproj-cli
 ```
 
-#### Swift Script Install (Development)
-For development or if you prefer the script version:
 
-1. Install swift-sh:
-```bash
-brew install swift-sh
-```
-
-2. Download the script:
-```bash
-curl -O https://raw.githubusercontent.com/tolo/xcodeproj-cli/main/src/xcodeproj-cli.swift
-chmod +x xcodeproj-cli.swift
-```
-
-#### Development Setup
-To contribute or build from source:
+#### Build from Source
+For development or custom builds:
 ```bash
 git clone https://github.com/tolo/xcodeproj-cli.git
 cd xcodeproj-cli
 
-# Option 1: Use the installer for quick setup
-./install.sh
-
-# Option 2: Build from Swift Package Manager
+# Build with Swift Package Manager
 swift build -c release
 .build/release/xcodeproj-cli --help
 
-# Option 3: Build universal binary
+# Or build universal binary
 ./build-universal.sh
 ./xcodeproj-cli --help
 ```
@@ -140,11 +124,7 @@ swift build -c release
 
 #### Command Syntax & Options
 ```bash
-# If installed via Homebrew:
 xcodeproj-cli [options] <command> [arguments]
-
-# If using Swift script:
-./xcodeproj-cli.swift [options] <command> [arguments]
 
 # Specify project (default: looks for *.xcodeproj in current directory)
 xcodeproj-cli --project MyApp.xcodeproj <command>
@@ -396,7 +376,7 @@ If you're an AI coding assistant (Claude Code, GitHub Copilot, etc.), here are k
 
 ### Quick Start
 ```bash
-# Always specify the project file (if using Homebrew)
+# Always specify the project file
 xcodeproj-cli --project App.xcodeproj <command>
 
 # Test your command first with dry-run
@@ -670,29 +650,24 @@ The tool provides clear error messages for common issues:
 
 - **Fast execution** - No Xcode or Docker overhead
 - **Batch processing** - Multiple operations in single run
-- **Smart caching** - Reuses swift-sh dependency cache
+- **Smart caching** - Swift Package Manager caches dependencies
 - **Minimal dependencies** - Only requires XcodeProj library
 
 ## Comparison with Alternatives
 
-| Feature | xcodeproj-cli (Homebrew) | xcodeproj-cli (Script) | xcodeproj-mcp-server | Xcode |
-|---------|--------------------------|------------------------|---------------------|-------|
-| No Dependencies | ✅ | ❌ (swift-sh) | ❌ (Docker) | ✅ |
-| Installation Speed | ✅ Fast | ⚠️ Medium | ❌ Slow | N/A |
-| Execution Speed | ✅ Fastest | ⚠️ Fast | ❌ Slower | ❌ Slow |
-| Command Line | ✅ | ✅ | ✅ | ❌ |
-| Scriptable | ✅ | ✅ | ✅ | ⚠️ |
-| All Project Features | ✅ | ✅ | ✅ | ✅ |
-| Cross-Architecture | ✅ Universal | ⚠️ Source | ❌ Docker | ✅ |
+| Feature | xcodeproj-cli | xcodeproj-mcp-server | Xcode |
+|---------|---------------|---------------------|-------|
+| No Dependencies | ✅ | ❌ (Docker) | ✅ |
+| Installation Speed | ✅ Fast | ❌ Slow | N/A |
+| Execution Speed | ✅ Fastest | ❌ Slower | ❌ Slow |
+| Command Line | ✅ | ✅ | ❌ |
+| Scriptable | ✅ | ✅ | ⚠️ |
+| All Project Features | ✅ | ✅ | ✅ |
+| Universal Binary | ✅ | ❌ Docker | ✅ |
 
 ## Troubleshooting
 
 ### Common Issues
-
-**swift-sh not found**
-```bash
-brew install swift-sh
-```
 
 **Permission denied**
 ```bash
@@ -701,8 +676,9 @@ chmod +x xcodeproj-cli.swift
 
 **XcodeProj dependency error**
 ```bash
-# Clear cache and retry
-rm -rf ~/Library/Developer/swift-sh.cache
+# Clear SPM cache and retry
+rm -rf .build
+swift build -c release
 ```
 
 **Project file backup**
@@ -729,19 +705,23 @@ This tool is provided as-is for use in your projects. Feel free to modify and di
 
 ```
 xcodeproj-cli/
-├── src/
-│   └── xcodeproj-edit.swift   # Main tool implementation
+├── Sources/
+│   └── xcodeproj-cli/
+│       └── main.swift         # Main tool implementation
+├── Package.swift              # Swift Package Manager configuration
+├── build-universal.sh         # Universal binary build script
+├── .github/
+│   └── workflows/
+│       └── release.yml        # Automated release workflow
 ├── test/
 │   ├── test.sh                # Shell-based test runner
 │   ├── TestSuite.swift        # Swift test suite
 │   └── TestData/
 │       └── TestProject.xcodeproj/  # Test project for validation
 ├── README.md                  # This file
-├── EXAMPLES.md               # Usage examples and workflows
 ├── CHANGELOG.md              # Version history and changes
 ├── LICENSE                   # MIT License
-├── VERSION                   # Current version number
-└── install.sh               # Installation script
+└── install.sh                # Installation script
 ```
 
 ## Credits & Attribution
@@ -752,15 +732,16 @@ xcodeproj-cli/
   - Provides the core Xcode project file manipulation capabilities
   - Version: 8.12.0+
 
-- **[swift-sh](https://github.com/mxcl/swift-sh)** (Unlicense)
-  - Created by Max Howell
-  - Enables Swift scripts with package dependencies
+- **[PathKit](https://github.com/kylef/PathKit)** (BSD License)
+  - Created by Kyle Fuller
+  - Provides path manipulation utilities
+  - Version: 1.0.0+
 
 ### Inspiration
 - **[xcodeproj-mcp-server](https://github.com/giginet/xcodeproj-mcp-server)** (MIT License)
   - Created by giginet
   - Inspired the comprehensive feature set and command structure
-  - This tool reimplements similar functionality as a standalone Swift script
+  - This tool reimplements similar functionality as a standalone binary
 
 ### Contributors
 This tool was developed for Xcode project automation and is released under the MIT License for community use.

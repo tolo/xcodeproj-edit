@@ -5,6 +5,42 @@ All notable changes to xcodeproj-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-08-12
+
+### ⚠️ BREAKING CHANGES
+- **Removed Swift script version** - xcodeproj-cli is now distributed exclusively as a compiled binary
+- **Installation changed** - Script-based installation is no longer supported; use Homebrew or binary installation
+- **File structure changed** - Source code moved from `src/xcodeproj-cli.swift` to `Sources/xcodeproj-cli/main.swift`
+
+### Added
+- Swift Package Manager configuration (`Package.swift`)
+- Universal binary build support (Intel + Apple Silicon)
+- GitHub Actions workflow for automated releases
+- Pre-built binary distribution via GitHub Releases
+- Homebrew tap support for easy installation
+
+### Changed
+- Migrated from Swift script to compiled binary for better performance
+- Simplified installation to Homebrew-only approach
+- Removed dependency on swift-sh for end users
+- Improved startup performance (no dependency resolution at runtime)
+
+### Removed
+- Swift script version (`src/xcodeproj-cli.swift`)
+- Script installation option from install.sh
+- Runtime dependency on swift-sh
+
+### Migration Guide
+If you were using the Swift script version (v1.x), you'll need to:
+1. Uninstall the old script version
+2. Install v2.0.0 via Homebrew: `brew tap tolo/xcodeproj && brew install xcodeproj-cli`
+3. The tool is now available as `xcodeproj-cli` (not `xcodeproj-cli.swift`)
+
+### Technical Notes
+- The codebase has been migrated from a Swift script to a proper Swift Package Manager structure
+- A comprehensive refactoring into a modular architecture is planned for v2.1.0
+- This release focuses on the distribution mechanism change while maintaining full compatibility
+
 ## [1.1.0] - 2025-08-11
 
 ### Added
