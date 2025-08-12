@@ -8,6 +8,10 @@ set -e
 echo "🔧 XcodeProj CLI Installer"
 echo "=========================="
 echo ""
+echo "Two installation methods available:"
+echo "  1. Homebrew (recommended) - Pre-built binary, no dependencies"
+echo "  2. Swift Script - Requires swift-sh, runs from source"
+echo ""
 
 # Check for macOS
 if [[ "$OSTYPE" != "darwin"* ]]; then
@@ -55,5 +59,7 @@ echo "  xcodeproj-cli --project MyApp.xcodeproj list-targets"
 echo ""
 echo "📖 For full documentation, visit:"
 echo "  https://github.com/tolo/xcodeproj-cli"
+echo ""
+echo "💡 Pro tip: The Homebrew version is faster and has no dependencies!"
 echo ""
 echo "🎉 Happy coding!"
