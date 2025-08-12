@@ -52,43 +52,85 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 ## Installation
 
 ### Prerequisites
-- macOS 10.15+
-- Swift 5.0+
-- [swift-sh](https://github.com/mxcl/swift-sh) (for dependency management)
+- macOS 10.15+ (Catalina or later)
+- For Homebrew installation: No additional dependencies
+- For Swift script installation: Swift 5.0+ and [swift-sh](https://github.com/mxcl/swift-sh)
 
 ### Installation
 
-#### Quick Install (Recommended)
-Install dependencies and download the tool in one command:
+#### Homebrew (Recommended) 🍺
+Fastest installation with pre-built universal binary. No dependencies required!
+
+```bash
+# Add the tap
+brew tap tolo/xcodeproj
+
+# Install the tool
+brew install xcodeproj-cli
+```
+
+The tool will be available as `xcodeproj-cli` in your PATH:
+```bash
+xcodeproj-cli --help
+xcodeproj-cli --project MyApp.xcodeproj list-targets
+```
+
+#### Interactive Installer
+Choose between Homebrew or Swift script installation:
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/tolo/xcodeproj-cli/main/install.sh)"
 ```
 
-This will:
-- Check for and install `swift-sh` if needed (via Homebrew)
-- Download the tool to your current directory
-- Make it executable
+This installer will:
+- Let you choose between Homebrew (binary) or Swift script installation
+- Handle all dependencies automatically
+- Set up the tool for immediate use
 
-#### Manual Install
-If you prefer to install manually:
+#### Manual Binary Install
+Download pre-built binary from releases:
 
-1. Install swift-sh (required for dependency management):
+1. Download the latest release:
+```bash
+curl -L "https://github.com/tolo/xcodeproj-cli/releases/latest/download/xcodeproj-cli-$(curl -s https://api.github.com/repos/tolo/xcodeproj-cli/releases/latest | grep 'tag_name' | cut -d'"' -f4)-macos.tar.gz" -o xcodeproj-cli.tar.gz
+```
+
+2. Extract and install:
+```bash
+tar -xzf xcodeproj-cli.tar.gz
+sudo mv xcodeproj-cli /usr/local/bin/
+chmod +x /usr/local/bin/xcodeproj-cli
+```
+
+#### Swift Script Install (Development)
+For development or if you prefer the script version:
+
+1. Install swift-sh:
 ```bash
 brew install swift-sh
 ```
 
-2. Download the tool:
+2. Download the script:
 ```bash
 curl -O https://raw.githubusercontent.com/tolo/xcodeproj-cli/main/src/xcodeproj-cli.swift
 chmod +x xcodeproj-cli.swift
 ```
 
-#### Clone Repository
-To get the full project with tests and examples:
+#### Development Setup
+To contribute or build from source:
 ```bash
 git clone https://github.com/tolo/xcodeproj-cli.git
 cd xcodeproj-cli
+
+# Option 1: Use the installer for quick setup
 ./install.sh
+
+# Option 2: Build from Swift Package Manager
+swift build -c release
+.build/release/xcodeproj-cli --help
+
+# Option 3: Build universal binary
+./build-universal.sh
+./xcodeproj-cli --help
 ```
 
 
@@ -98,21 +140,24 @@ cd xcodeproj-cli
 
 #### Command Syntax & Options
 ```bash
-# Basic syntax
+# If installed via Homebrew:
+xcodeproj-cli [options] <command> [arguments]
+
+# If using Swift script:
 ./xcodeproj-cli.swift [options] <command> [arguments]
 
 # Specify project (default: looks for *.xcodeproj in current directory)
-./xcodeproj-cli.swift --project MyApp.xcodeproj <command>
+xcodeproj-cli --project MyApp.xcodeproj <command>
 
 # Preview changes without saving (dry-run mode)
-./xcodeproj-cli.swift --dry-run <command>
+xcodeproj-cli --dry-run <command>
 
 # Combine options
-./xcodeproj-cli.swift --project App.xcodeproj --dry-run add-file File.swift --group Group --targets Target
+xcodeproj-cli --project App.xcodeproj --dry-run add-file File.swift --group Group --targets Target
 
 # Many flags have short forms for convenience:
 # --group / -g, --targets / -t, --recursive / -r
-./xcodeproj-cli.swift add-file Helper.swift -g Utils -t MyApp
+xcodeproj-cli add-file Helper.swift -g Utils -t MyApp
 ```
 
 ### Common Workflows
@@ -122,10 +167,10 @@ cd xcodeproj-cli
 **Adding Files**
 ```bash
 # Add a single file to a group and target
-./xcodeproj-cli.swift add-file Sources/Helper.swift --group Utils --targets MyApp
+xcodeproj-cli add-file Sources/Helper.swift --group Utils --targets MyApp
 
 # Add multiple files at once
-./xcodeproj-cli.swift add-files \
+xcodeproj-cli add-files \
   Model.swift:Models \
   View.swift:Views \
   Controller.swift:Controllers \
@@ -135,35 +180,35 @@ cd xcodeproj-cli
 **Adding Folders**
 ```bash
 # Add all files from a folder recursively (files are added individually)
-./xcodeproj-cli.swift add-folder Sources/Features --group Features --targets MyApp --recursive
+xcodeproj-cli add-folder Sources/Features --group Features --targets MyApp --recursive
 
 # Add a synchronized folder (Xcode 16+ - auto-syncs with filesystem)
-./xcodeproj-cli.swift add-sync-folder Resources/Assets --group Assets --targets MyApp
+xcodeproj-cli add-sync-folder Resources/Assets --group Assets --targets MyApp
 ```
 
 **Managing Files**
 ```bash
 # Move or rename a file
-./xcodeproj-cli.swift move-file OldPath/File.swift NewPath/File.swift
+xcodeproj-cli move-file OldPath/File.swift NewPath/File.swift
 
 # Remove a file from the project
-./xcodeproj-cli.swift remove-file Sources/Deprecated.swift
+xcodeproj-cli remove-file Sources/Deprecated.swift
 
 # Remove an entire folder
-./xcodeproj-cli.swift remove-folder Resources/OldAssets
+xcodeproj-cli remove-folder Resources/OldAssets
 ```
 
 #### 🗂️ Working with Groups (Virtual Organization)
 
 ```bash
 # Create groups for organizing files (no filesystem folders created)
-./xcodeproj-cli.swift add-group UI/Components UI/Screens Services/API
+xcodeproj-cli add-group UI/Components UI/Screens Services/API
 
 # Show complete project structure (RECOMMENDED)
-./xcodeproj-cli.swift list-tree
+xcodeproj-cli list-tree
 
 # List groups only in tree format (no files)
-./xcodeproj-cli.swift list-groups
+xcodeproj-cli list-groups
 # Output:
 # MyProject
 # ├── Sources
@@ -173,39 +218,39 @@ cd xcodeproj-cli
 #     └── Profile
 
 # Remove a group (files remain in project)
-./xcodeproj-cli.swift remove-group UI/OldComponents
+xcodeproj-cli remove-group UI/OldComponents
 ```
 
 #### 🎯 Target Management
 
 ```bash
 # Create a new target
-./xcodeproj-cli.swift add-target MyFramework --type com.apple.product-type.framework --bundle-id com.example.framework
+xcodeproj-cli add-target MyFramework --type com.apple.product-type.framework --bundle-id com.example.framework
 
 # Duplicate an existing target
-./xcodeproj-cli.swift duplicate-target MyApp MyAppPro --bundle-id com.example.pro
+xcodeproj-cli duplicate-target MyApp MyAppPro --bundle-id com.example.pro
 
 # Remove a target
-./xcodeproj-cli.swift remove-target OldTarget
+xcodeproj-cli remove-target OldTarget
 
 # Add dependency between targets
-./xcodeproj-cli.swift add-dependency MyApp --depends-on MyFramework
+xcodeproj-cli add-dependency MyApp --depends-on MyFramework
 
 # List all targets
-./xcodeproj-cli.swift list-targets
+xcodeproj-cli list-targets
 ```
 
 #### ⚙️ Build Settings & Configuration
 
 ```bash
 # Set a build setting for specific targets
-./xcodeproj-cli.swift set-build-setting SWIFT_VERSION 5.9 --targets MyApp,MyAppTests
+xcodeproj-cli set-build-setting SWIFT_VERSION 5.9 --targets MyApp,MyAppTests
 
 # Get build settings for a target
-./xcodeproj-cli.swift get-build-settings MyApp --config Debug
+xcodeproj-cli get-build-settings MyApp --config Debug
 
 # List all build configurations
-./xcodeproj-cli.swift list-build-configs --target MyApp
+xcodeproj-cli list-build-configs --target MyApp
 ```
 
 #### 📦 Dependencies & Frameworks
@@ -213,58 +258,58 @@ cd xcodeproj-cli
 **System Frameworks**
 ```bash
 # Add a system framework
-./xcodeproj-cli.swift add-framework CoreData --target MyApp
+xcodeproj-cli add-framework CoreData --target MyApp
 
 # Add and embed a custom framework
-./xcodeproj-cli.swift add-framework Custom.framework --target MyApp --embed
+xcodeproj-cli add-framework Custom.framework --target MyApp --embed
 ```
 
 **Swift Package Manager**
 ```bash
 # Add package with version requirement
-./xcodeproj-cli.swift add-swift-package \
+xcodeproj-cli add-swift-package \
   https://github.com/Alamofire/Alamofire \
   --requirement "from: 5.8.0" \
   --target MyApp
 
 # Add package from branch
-./xcodeproj-cli.swift add-swift-package \
+xcodeproj-cli add-swift-package \
   https://github.com/realm/SwiftLint \
   --requirement "branch: main" \
   --target MyApp
 
 # Remove a package
-./xcodeproj-cli.swift remove-swift-package https://github.com/Alamofire/Alamofire
+xcodeproj-cli remove-swift-package https://github.com/Alamofire/Alamofire
 
 # List all packages
-./xcodeproj-cli.swift list-swift-packages
+xcodeproj-cli list-swift-packages
 ```
 
 #### 🔧 Build Phases
 
 ```bash
 # Add a run script phase
-./xcodeproj-cli.swift add-build-phase run_script \
+xcodeproj-cli add-build-phase run_script \
   --name "SwiftLint" --target MyApp \
   --script "if which swiftlint; then swiftlint; fi"
 
 # Add a copy files phase
-./xcodeproj-cli.swift add-build-phase copy_files --name "Copy Fonts" --target MyApp
+xcodeproj-cli add-build-phase copy_files --name "Copy Fonts" --target MyApp
 ```
 
 #### 🔍 Project Inspection & Validation
 
 ```bash
 # Validate project integrity
-./xcodeproj-cli.swift validate
+xcodeproj-cli validate
 
 # List and clean up invalid file references
-./xcodeproj-cli.swift list-invalid-references
-./xcodeproj-cli.swift remove-invalid-references
+xcodeproj-cli list-invalid-references
+xcodeproj-cli remove-invalid-references
 
 # Show complete project structure (recommended)
 # Virtual groups shown without paths, actual files/folders with paths
-./xcodeproj-cli.swift list-tree
+xcodeproj-cli list-tree
 # Output example:
 # MyProject
 # ├── Sources              <- Virtual group (no path)
@@ -291,10 +336,10 @@ Xcode has three distinct ways to organize and reference files in your project:
 
 ```bash
 # Create virtual organization structure
-./xcodeproj-cli.swift add-group UI/Components UI/Screens
+xcodeproj-cli add-group UI/Components UI/Screens
 
 # Files can be in any disk location but appear organized in Xcode
-./xcodeproj-cli.swift add-file random/path/Button.swift --group UI/Components --targets MyApp
+xcodeproj-cli add-file random/path/Button.swift --group UI/Components --targets MyApp
 ```
 
 #### 2️⃣ **Folder References** - Live Filesystem Sync
@@ -306,7 +351,7 @@ Xcode has three distinct ways to organize and reference files in your project:
 
 ```bash
 # Creates a synchronized folder reference (Xcode 16+)
-./xcodeproj-cli.swift add-sync-folder Resources/Images --group Images --targets MyApp
+xcodeproj-cli add-sync-folder Resources/Images --group Images --targets MyApp
 # Any files added to Resources/Images on disk automatically appear in Xcode
 ```
 
@@ -319,7 +364,7 @@ Xcode has three distinct ways to organize and reference files in your project:
 
 ```bash
 # Adds each file from the folder individually
-./xcodeproj-cli.swift add-folder Sources/Features --group Features --targets MyApp --recursive
+xcodeproj-cli add-folder Sources/Features --group Features --targets MyApp --recursive
 # You control exactly which files are included
 ```
 
@@ -328,20 +373,20 @@ Xcode has three distinct ways to organize and reference files in your project:
 **Scenario 1: Organizing existing files**
 ```bash
 # Just create groups - no need to move files on disk
-./xcodeproj-cli.swift add-group Architecture/MVVM/Models Architecture/MVVM/Views
-./xcodeproj-cli.swift add-file Sources/User.swift --group Architecture/MVVM/Models --targets MyApp
+xcodeproj-cli add-group Architecture/MVVM/Models Architecture/MVVM/Views
+xcodeproj-cli add-file Sources/User.swift --group Architecture/MVVM/Models --targets MyApp
 ```
 
 **Scenario 2: Adding a folder of source files**
 ```bash
 # No groups needed - they're created automatically
-./xcodeproj-cli.swift add-folder Sources/NewFeature --group Features --targets MyApp --recursive
+xcodeproj-cli add-folder Sources/NewFeature --group Features --targets MyApp --recursive
 ```
 
 **Scenario 3: Adding frequently-changing resources**
 ```bash
 # Use sync folder for assets that designers update
-./xcodeproj-cli.swift add-sync-folder Design/Assets --group Resources --targets MyApp
+xcodeproj-cli add-sync-folder Design/Assets --group Resources --targets MyApp
 ```
 
 
@@ -351,11 +396,11 @@ If you're an AI coding assistant (Claude Code, GitHub Copilot, etc.), here are k
 
 ### Quick Start
 ```bash
-# Always specify the project file
-./xcodeproj-cli.swift --project App.xcodeproj <command>
+# Always specify the project file (if using Homebrew)
+xcodeproj-cli --project App.xcodeproj <command>
 
 # Test your command first with dry-run
-./xcodeproj-cli.swift --dry-run --project App.xcodeproj add-file Helper.swift --group Utils --targets App
+xcodeproj-cli --dry-run --project App.xcodeproj add-file Helper.swift --group Utils --targets App
 
 # Common operations
 add-file File.swift --group Group --targets Target  # Add single file
@@ -383,21 +428,21 @@ validate                              # Check project health
 
 ```bash
 # Create the folder structure
-./xcodeproj-cli.swift add-group \
+xcodeproj-cli add-group \
   Features/UserProfile \
   Features/UserProfile/Models \
   Features/UserProfile/Views \
   Features/UserProfile/ViewModels
 
 # Add all files from your feature folder
-./xcodeproj-cli.swift add-folder \
+xcodeproj-cli add-folder \
   Sources/UserProfile \
   --group Features/UserProfile \
   --targets MyApp,MyAppTests \
   --recursive
 
 # Add required dependencies
-./xcodeproj-cli.swift add-swift-package \
+xcodeproj-cli add-swift-package \
   https://github.com/firebase/firebase-ios-sdk \
   --requirement "from: 10.0.0" \
   --target MyApp
@@ -407,20 +452,20 @@ validate                              # Check project health
 
 ```bash
 # Create Pro and Lite versions of your app
-./xcodeproj-cli.swift duplicate-target MyApp MyAppPro --bundle-id com.example.pro
-./xcodeproj-cli.swift duplicate-target MyApp MyAppLite --bundle-id com.example.lite
+xcodeproj-cli duplicate-target MyApp MyAppPro --bundle-id com.example.pro
+xcodeproj-cli duplicate-target MyApp MyAppLite --bundle-id com.example.lite
 
 # Configure different build settings for each variant
-./xcodeproj-cli.swift set-build-setting PRODUCT_NAME "MyApp Pro" --targets MyAppPro
-./xcodeproj-cli.swift set-build-setting ENABLE_PREMIUM_FEATURES YES --targets MyAppPro
-./xcodeproj-cli.swift set-build-setting ENABLE_ADS YES --targets MyAppLite
+xcodeproj-cli set-build-setting PRODUCT_NAME "MyApp Pro" --targets MyAppPro
+xcodeproj-cli set-build-setting ENABLE_PREMIUM_FEATURES YES --targets MyAppPro
+xcodeproj-cli set-build-setting ENABLE_ADS YES --targets MyAppLite
 ```
 
 ### Adding CI/CD Build Phases
 
 ```bash
 # Add SwiftLint
-./xcodeproj-cli.swift add-build-phase \
+xcodeproj-cli add-build-phase \
   run_script \
   --name "SwiftLint" \
   --target MyApp \
@@ -431,7 +476,7 @@ else
 fi'
 
 # Add automatic build number increment
-./xcodeproj-cli.swift add-build-phase \
+xcodeproj-cli add-build-phase \
   run_script \
   --name "Increment Build Number" \
   --target MyApp \
@@ -447,7 +492,7 @@ buildNumber=$((buildNumber + 1))
 # Import all Swift files from a directory while preserving structure
 find Sources -name "*.swift" | while read file; do
   group=$(dirname "$file" | sed 's/Sources\//Classes\//')
-  ./xcodeproj-cli.swift add-file "$file" --group "$group" --targets MyApp
+  xcodeproj-cli add-file "$file" --group "$group" --targets MyApp
 done
 ```
 
@@ -553,14 +598,14 @@ When creating targets, use these Apple product type identifiers:
 **Batch Operations**
 ```bash
 # Add multiple files with different groups
-./xcodeproj-cli.swift add-files \
+xcodeproj-cli add-files \
   Model.swift:Models \
   View.swift:Views \
   ViewModel.swift:ViewModels \
   --targets MyApp,MyAppTests
 
 # Create a complete group structure at once
-./xcodeproj-cli.swift add-group \
+xcodeproj-cli add-group \
   Features/Authentication \
   Features/Profile \
   Features/Settings \
@@ -571,7 +616,7 @@ When creating targets, use these Apple product type identifiers:
 **Using Dry-Run Mode**
 ```bash
 # Always test complex operations first
-./xcodeproj-cli.swift --dry-run add-folder LargeFolder / MyApp --recursive
+xcodeproj-cli --dry-run add-folder LargeFolder / MyApp --recursive
 # Review output, then run without --dry-run if correct
 ```
 
@@ -580,26 +625,26 @@ When creating targets, use these Apple product type identifiers:
 **Example 1: Adding a new feature module**
 ```bash
 # Add source files from a feature folder (groups are created automatically)
-./xcodeproj-cli.swift add-folder Sources/Checkout --group Features/Checkout --targets ShoppingCart --recursive
+xcodeproj-cli add-folder Sources/Checkout --group Features/Checkout --targets ShoppingCart --recursive
 
 # Add the payment SDK
-./xcodeproj-cli.swift add-swift-package https://github.com/stripe/stripe-ios --requirement "from: 23.0.0" --target ShoppingCart
+xcodeproj-cli add-swift-package https://github.com/stripe/stripe-ios --requirement "from: 23.0.0" --target ShoppingCart
 ```
 
 **Example 2: Setting up a Pro version of your app**
 ```bash
 # Duplicate the target
-./xcodeproj-cli.swift duplicate-target MyApp MyAppPro --bundle-id com.example.pro
+xcodeproj-cli duplicate-target MyApp MyAppPro --bundle-id com.example.pro
 
 # Customize the Pro version
-./xcodeproj-cli.swift set-build-setting PRODUCT_NAME "MyApp Pro" --targets MyAppPro
-./xcodeproj-cli.swift set-build-setting ENABLE_PRO_FEATURES YES --targets MyAppPro
+xcodeproj-cli set-build-setting PRODUCT_NAME "MyApp Pro" --targets MyAppPro
+xcodeproj-cli set-build-setting ENABLE_PRO_FEATURES YES --targets MyAppPro
 ```
 
 **Example 3: Organizing an existing messy project**
 ```bash
 # Create a clean structure with groups (no files are moved on disk)
-./xcodeproj-cli.swift add-group \
+xcodeproj-cli add-group \
   Architecture/Models \
   Architecture/Views \
   Architecture/ViewModels \
@@ -607,8 +652,8 @@ When creating targets, use these Apple product type identifiers:
   Architecture/Utilities
 
 # Now you can add existing files to these groups
-./xcodeproj-cli.swift add-file Sources/User.swift --group Architecture/Models --targets MyApp
-./xcodeproj-cli.swift add-file Sources/LoginView.swift --group Architecture/Views --targets MyApp
+xcodeproj-cli add-file Sources/User.swift --group Architecture/Models --targets MyApp
+xcodeproj-cli add-file Sources/LoginView.swift --group Architecture/Views --targets MyApp
 ```
 
 ## Error Handling
@@ -630,15 +675,15 @@ The tool provides clear error messages for common issues:
 
 ## Comparison with Alternatives
 
-| Feature | xcodeproj-cli | xcodeproj-mcp-server | Xcode |
-|---------|---------------|---------------------|-------|
-| No GUI Required | ✅ | ✅ | ❌ |
-| No Docker Required | ✅ | ❌ | ✅ |
-| Command Line | ✅ | ✅ | ❌ |
-| Scriptable | ✅ | ✅ | ⚠️ |
-| All Project Features | ✅ | ✅ | ✅ |
-| Speed | Fast | Slower | Slow |
-| Installation | Simple | Complex | N/A |
+| Feature | xcodeproj-cli (Homebrew) | xcodeproj-cli (Script) | xcodeproj-mcp-server | Xcode |
+|---------|--------------------------|------------------------|---------------------|-------|
+| No Dependencies | ✅ | ❌ (swift-sh) | ❌ (Docker) | ✅ |
+| Installation Speed | ✅ Fast | ⚠️ Medium | ❌ Slow | N/A |
+| Execution Speed | ✅ Fastest | ⚠️ Fast | ❌ Slower | ❌ Slow |
+| Command Line | ✅ | ✅ | ✅ | ❌ |
+| Scriptable | ✅ | ✅ | ✅ | ⚠️ |
+| All Project Features | ✅ | ✅ | ✅ | ✅ |
+| Cross-Architecture | ✅ Universal | ⚠️ Source | ❌ Docker | ✅ |
 
 ## Troubleshooting
 
