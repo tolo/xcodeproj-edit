@@ -24,3 +24,5 @@ test/TestData/TestFolder/
 # Claude Code
 .claude/settings.local.json
 ai_docs/temp
+.claude/agents
+.claude/commands
