@@ -19,7 +19,7 @@ xcodeproj-cli is a powerful command-line utility for programmatically manipulati
 
 - **Swift 5.0+** - Core implementation language
 - **swift-sh** - Swift script dependency management
-- **XcodeProj Library** (tuist/XcodeProj v8.12.0+) - Core .xcodeproj manipulation
+- **XcodeProj Library** (tuist/XcodeProj v9.4.3+) - Core .xcodeproj manipulation
 - **PathKit** - Swift path manipulation library
 - **macOS 10.15+** - Required platform
 
@@ -163,6 +163,7 @@ Before implementing ANY feature, ask:
 
 ### Code Style
 - Use Swift naming conventions (PascalCase for types, camelCase for methods)
+- Prefer structs over classes for data models
 - Prefer guard statements for early returns
 - Use swift-format for consistent formatting
 
@@ -176,7 +177,6 @@ Before implementing ANY feature, ask:
 - Test suite uses real project manipulation (not mocks)
 - Tests are organized by feature area
 - Each test should be independent and restorable
-- Use backup/restore pattern for destructive tests
 - Always verify both positive and negative cases
 
 

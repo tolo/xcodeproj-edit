@@ -1,7 +1,7 @@
 #!/usr/bin/swift sh
 
 // XcodeProj CLI - Comprehensive Xcode Project Manipulation Utility
-// Version: 1.0.0
+// Version: 1.1.0
 // License: MIT
 //
 // A powerful command-line tool for programmatically manipulating Xcode project files
