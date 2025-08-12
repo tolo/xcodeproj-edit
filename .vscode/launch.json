@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:xcodeproj-tool}",
+            "name": "Debug xcodeproj-cli",
+            "program": "${workspaceFolder:xcodeproj-tool}/.build/debug/xcodeproj-cli",
+            "preLaunchTask": "swift: Build Debug xcodeproj-cli"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:xcodeproj-tool}",
+            "name": "Release xcodeproj-cli",
+            "program": "${workspaceFolder:xcodeproj-tool}/.build/release/xcodeproj-cli",
+            "preLaunchTask": "swift: Build Release xcodeproj-cli"
+        }
+    ]
+}

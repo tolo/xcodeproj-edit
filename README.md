@@ -4,6 +4,8 @@
 
 A powerful command-line utility for manipulating Xcode project files (.xcodeproj) without requiring Xcode or Docker. Designed for both **human developers** and **AI coding assistants** (like Claude Code, GitHub Copilot, and other LLM-based tools) to automate Xcode project management.
 
+**Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 55+ specialized modules, comprehensive test suites, and `--verbose` flag for detailed operation insights.
+
 ## Acknowledgments
 
 This tool is built on top of the excellent [XcodeProj](https://github.com/tuist/XcodeProj) library by the Tuist team, which provides the core functionality for reading and writing Xcode project files.
@@ -44,6 +46,9 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 - **Dry-run mode** - Preview changes before applying
 - **Atomic saves** - Automatic backup and rollback on failure
 - **Transaction support** - Group operations with rollback capability
+- **Performance optimizations** - Intelligent caching system with cache hit/miss statistics
+- **Verbose mode** - Detailed operation insights with `--verbose` flag
+- **Modular architecture** - 55+ specialized modules for maintainability
 
 ### 🔒 Security Features
 - **Path traversal protection** - Prevents directory escaping
@@ -132,12 +137,15 @@ xcodeproj-cli --project MyApp.xcodeproj <command>
 # Preview changes without saving (dry-run mode)
 xcodeproj-cli --dry-run <command>
 
+# Enable verbose output with performance metrics
+xcodeproj-cli --verbose <command>
+
 # Combine options
-xcodeproj-cli --project App.xcodeproj --dry-run add-file File.swift --group Group --targets Target
+xcodeproj-cli --project App.xcodeproj --dry-run --verbose add-file File.swift --group Group --targets Target
 
 # Many flags have short forms for convenience:
-# --group / -g, --targets / -t, --recursive / -r
-xcodeproj-cli add-file Helper.swift -g Utils -t MyApp
+# --group / -g, --targets / -t, --recursive / -r, --verbose / -V
+xcodeproj-cli add-file Helper.swift -g Utils -t MyApp -V
 ```
 
 ### Common Workflows
@@ -392,9 +400,10 @@ validate                              # Check project health
 ### Best Practices
 1. **Always use `--project`** to specify the exact .xcodeproj file
 2. **Use `--dry-run`** first to preview changes
-3. **Check available targets** with `list-targets` before adding files
-4. **Use `list-groups`** to see the project structure
-5. **Run `validate`** after bulk operations
+3. **Use `--verbose`** to monitor performance and see detailed operation insights
+4. **Check available targets** with `list-targets` before adding files
+5. **Use `list-groups`** to see the project structure
+6. **Run `validate`** after bulk operations
 
 ### Path Handling
 - Relative paths (e.g., `Sources/Helper.swift`) are preferred for project files
@@ -600,6 +609,18 @@ xcodeproj-cli --dry-run add-folder LargeFolder / MyApp --recursive
 # Review output, then run without --dry-run if correct
 ```
 
+**Using Verbose Mode for Performance Insights**
+```bash
+# Monitor operation performance and cache efficiency
+xcodeproj-cli --verbose add-folder Sources/Features --group Features --targets MyApp --recursive
+
+# Example verbose output:
+# Cache hit rate: 85% (17/20 lookups)
+# Operation timing: 127ms total
+# Files processed: 15
+# Groups created: 3
+```
+
 ### Real-World Examples
 
 **Example 1: Adding a new feature module**
@@ -651,7 +672,11 @@ The tool provides clear error messages for common issues:
 - **Fast execution** - No Xcode or Docker overhead
 - **Batch processing** - Multiple operations in single run
 - **Smart caching** - Swift Package Manager caches dependencies
+- **Intelligent caching system** - Multi-level caching with O(1) lookups for groups, targets, and file references
+- **Performance profiling** - Use `--verbose` flag to see operation timing and cache statistics
 - **Minimal dependencies** - Only requires XcodeProj library
+- **Memory efficient** - Lazy initialization and automatic cleanup
+- **Optimized for large projects** - Tested with 1000+ files
 
 ## Comparison with Alternatives
 
@@ -671,7 +696,7 @@ The tool provides clear error messages for common issues:
 
 **Permission denied**
 ```bash
-chmod +x xcodeproj-cli.swift
+chmod +x xcodeproj-cli
 ```
 
 **XcodeProj dependency error**
@@ -707,15 +732,22 @@ This tool is provided as-is for use in your projects. Feel free to modify and di
 xcodeproj-cli/
 ├── Sources/
 │   └── xcodeproj-cli/
-│       └── main.swift         # Main tool implementation
+│       ├── main.swift         # Application entry point
+│       ├── CLI/               # Command-line interface layer
+│       ├── Commands/          # 30+ modular command implementations
+│       ├── Core/              # Core services (caching, transactions, validation)
+│       ├── Models/            # Data structures and error types
+│       └── Utils/             # Utility functions and helpers
 ├── Package.swift              # Swift Package Manager configuration
+├── ARCHITECTURE.md            # Detailed architecture documentation for developers
 ├── build-universal.sh         # Universal binary build script
 ├── .github/
 │   └── workflows/
 │       └── release.yml        # Automated release workflow
 ├── test/
-│   ├── test.sh                # Shell-based test runner
-│   ├── TestSuite.swift        # Swift test suite
+│   ├── TestSuite.swift        # Comprehensive test suite
+│   ├── SecurityTests.swift    # Security-focused test coverage
+│   ├── AdditionalTests.swift  # Extended test scenarios
 │   └── TestData/
 │       └── TestProject.xcodeproj/  # Test project for validation
 ├── README.md                  # This file
@@ -723,6 +755,8 @@ xcodeproj-cli/
 ├── LICENSE                   # MIT License
 └── install.sh                # Installation script
 ```
+
+**For Developers**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed information about the modular architecture, design patterns, performance optimizations, and extension points.
 
 ## Credits & Attribution
 

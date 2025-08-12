@@ -1,0 +1,73 @@
+//
+// AddSwiftPackageCommand.swift
+// xcodeproj-cli
+//
+// Command for adding Swift Package dependencies
+//
+
+import Foundation
+import XcodeProj
+
+/// Command for adding Swift Package dependencies to the project
+struct AddSwiftPackageCommand: Command {
+  static let commandName = "add-swift-package"
+  
+  static let description = "Add Swift Package dependency to the project"
+  
+  static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
+    // Validate required arguments
+    try requirePositionalArguments(
+      arguments,
+      count: 1,
+      usage: "add-swift-package requires: <url> --version <requirement> [--target <target>]"
+    )
+    
+    let url = arguments.positional[0]
+    
+    // Get required flags
+    let requirement = try arguments.requireFlag(
+      "--version", "-v",
+      error: "add-swift-package requires --version or -v flag"
+    )
+    
+    let targetName = arguments.getFlag("--target", "-t")
+    
+    // If target is specified, validate it exists
+    if let target = targetName {
+      try validateTargets([target], in: utility)
+    }
+    
+    // Execute the command
+    try utility.addSwiftPackage(url: url, requirement: requirement, to: targetName)
+    
+    // Save changes
+    try utility.save()
+  }
+  
+  static func printUsage() {
+    print("""
+      add-swift-package <url> --version <requirement> [--target <target>]
+        Add Swift Package dependency to the project
+        
+        Arguments:
+          <url>                     Package repository URL (https:// or git@)
+          --version, -v <req>       Version requirement (e.g., "1.0.0", "from: 1.0.0", "branch: main")
+          --target, -t <target>     Optional: target to add package to
+        
+        Examples:
+          add-swift-package https://github.com/Alamofire/Alamofire.git --version "from: 5.0.0"
+          add-swift-package https://github.com/realm/realm-swift.git -v "branch: master" -t MyApp
+      """)
+  }
+}
+
+// MARK: - BaseCommand conformance
+extension AddSwiftPackageCommand {
+  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+    try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
+  }
+  
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+    try BaseCommand.validateTargets(targetNames, in: utility)
+  }
+}

@@ -13,17 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **File structure changed** - Source code moved from `src/xcodeproj-cli.swift` to `Sources/xcodeproj-cli/main.swift`
 
 ### Added
+- **Modular Architecture**: Complete refactoring into 55+ specialized modules with clear separation of concerns
+- **Performance Optimizations**: Multi-level intelligent caching system with O(1) lookups for groups, targets, and file references
+- **Security Enhancements**: Comprehensive input validation, path sanitization, and command injection prevention
+- **Verbose Mode**: `--verbose` flag provides detailed operation timing, cache statistics, and performance metrics
+- **Enhanced Test Suites**: Security-focused tests, integration tests, and performance validation
+- **Core Services**: Transaction management, project validation, cache management, and build phase management
+- **Performance Profiling**: Built-in performance monitoring with timing reports and memory usage tracking
 - Swift Package Manager configuration (`Package.swift`)
 - Universal binary build support (Intel + Apple Silicon)
 - GitHub Actions workflow for automated releases
 - Pre-built binary distribution via GitHub Releases
 - Homebrew tap support for easy installation
+- ARCHITECTURE.md documentation for developers
 
 ### Changed
-- Migrated from Swift script to compiled binary for better performance
-- Simplified installation to Homebrew-only approach
-- Removed dependency on swift-sh for end users
-- Improved startup performance (no dependency resolution at runtime)
+- **Architecture Refactoring**: Migrated from single-file script to modular, service-oriented architecture
+- **Performance Improvements**: Dramatic performance gains through intelligent caching and optimized operations
+- **Build System**: Migrated from Swift script to compiled binary for better performance
+- **Installation Method**: Simplified installation to Homebrew-only approach
+- **Runtime Dependencies**: Removed dependency on swift-sh for end users
+- **Startup Performance**: Improved startup performance (no dependency resolution at runtime)
+- **Error Handling**: Enhanced error messages with actionable remediation steps
+- **Memory Management**: Optimized memory usage with lazy initialization and automatic cleanup
 
 ### Removed
 - Swift script version (`src/xcodeproj-cli.swift`)
@@ -37,9 +49,13 @@ If you were using the Swift script version (v1.x), you'll need to:
 3. The tool is now available as `xcodeproj-cli` (not `xcodeproj-cli.swift`)
 
 ### Technical Notes
-- The codebase has been migrated from a Swift script to a proper Swift Package Manager structure
-- A comprehensive refactoring into a modular architecture is planned for v2.1.0
-- This release focuses on the distribution mechanism change while maintaining full compatibility
+- **Complete Architecture Overhaul**: Migrated from single 1200+ line script to modular architecture with 55+ specialized Swift files
+- **Service-Oriented Design**: Implemented service layer with dedicated managers for caching, transactions, validation, and build phases
+- **Command Pattern**: Each CLI operation is now a discrete, testable command class
+- **Performance Analytics**: Built-in performance profiling with cache hit/miss statistics and operation timing
+- **Enhanced Security**: Comprehensive input validation and security utilities throughout the codebase
+- **Test Coverage**: Expanded from basic tests to comprehensive test suites including security and integration tests
+- Full backward compatibility maintained for all CLI commands and flags
 
 ## [1.1.0] - 2025-08-11
 

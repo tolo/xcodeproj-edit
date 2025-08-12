@@ -132,6 +132,9 @@ CUPID properties (https://cupid.dev/) focus on creating architectures that are "
   - Use the `Context7` MCP for looking up API documentation
 - Update README.md when important/major new features are added, dependencies change, or setup steps are modified.
 
+#### Use Sub Agents for Complex Tasks
+- Proactively delegate as much work as possible to the available sub agents for complex tasks, and let the main claude code agent act as an orchestrator.
+
 ### Coding Guidelines
 - Log significant operations and errors
 - Use descriptive variable names
@@ -186,7 +189,17 @@ Before implementing ANY feature, ask:
 - Always verify both positive and negative cases
 
 
-## Testing Guidelines
+## Testing and Code Analysis Guidelines
+
+### Code Analysis and Style (Analysis, Linting and Formatting)
+
+```bash
+# Swift code formatting (run after each task)
+swift-format format --in-place --recursive Pomaddoro
+
+# Swift code analysis and linting (run after each task)
+swift-format lint --recursive Pomaddoro
+```
 
 ### Running Tests
 ```bash
