@@ -70,7 +70,7 @@ cp /path/to/xcodeproj-tool/homebrew/README.md README.md
 5. Commit and push:
 ```bash
 git add .
-git commit -m "Add xcodeproj-cli formula v2.0.0"
+git commit -m "Add xcodeproj-cli formula vX.Y.Z"
 git push origin main
 ```
 

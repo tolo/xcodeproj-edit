@@ -37,63 +37,47 @@ list-targets                          # Show all targets
 validate                              # Check project integrity
 ```
 
-## Architecture Overview
+## Project Structure (Essential)
 
-### Project Structure
 ```
 xcodeproj-cli/
-├── Sources/
-│   └── xcodeproj-cli/
-│       └── main.swift              # Main tool implementation (30+ commands)
-├── Package.swift                   # Swift Package Manager configuration
-├── build-universal.sh              # Universal binary build script
-├── .github/
-│   └── workflows/
-│       └── release.yml             # Automated release workflow
-├── test/
-│   ├── TestSuite.swift            # Main Swift test suite
-│   ├── TestRunner.swift           # Test runner utility
-│   ├── AdditionalTests.swift      # Additional test cases
-│   ├── SecurityTests.swift        # Security-focused tests
-│   ├── create_test_project.swift  # Test project generator
-│   ├── README.md                  # Test documentation
-│   └── TestData/                  # Test fixtures
-├── README.md                      # Main documentation
-├── CLAUDE.md                      # Claude AI guidance
-├── CHANGELOG.md                   # Version history
-├── LICENSE                        # MIT License
-├── install.sh                     # Installation script
+├── Sources/xcodeproj-cli/          # Main implementation
+├── test/                           # Test suite and fixtures
+├── Package.swift                   # SPM configuration
+├── build-universal.sh              # Universal binary build
+└── .github/workflows/              # CI/CD automation
 ```
 
-### Core Components
+## Core Components (Quick Reference)
 
-1. **Command Parser**: Processes CLI arguments and routes to appropriate handlers
-2. **Project Manipulator**: Core XcodeProj library wrapper with safety checks
-3. **File Manager**: Smart file filtering and type detection
-4. **Group Manager**: Hierarchical group creation and management
-5. **Target Manager**: Target creation, duplication, and configuration
-6. **Build Settings Manager**: Build configuration manipulation
-7. **SPM Integration**: Swift Package Manager dependency management
+- **CLIRunner** - Main orchestrator
+- **CommandRegistry** - Command dispatch
+- **XcodeProjService** - Project manipulation
+- **CacheManager** - Performance optimization
+- **TransactionManager** - Safe operations
+- **ProjectValidator** - Integrity checking
 
-### Command Categories
+> **📋 For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md)**
 
-#### File Operations
+## Command Categories
+
+### File Operations
 - `add-file`, `add-files`, `add-folder`, `add-sync-folder`
 - `move-file`, `remove-file`
 
-#### Target Operations
+### Target Operations
 - `add-target`, `duplicate-target`, `remove-target`
 - `add-dependency`
 
-#### Build Configuration
+### Build Configuration
 - `set-build-setting`, `get-build-settings`
 - `list-build-configs`
 
-#### Dependencies
+### Dependencies
 - `add-framework`
 - `add-swift-package`, `remove-swift-package`, `list-swift-packages`
 
-#### Project Structure
+### Project Structure
 - `create-groups`, `list-groups`
 - `list-files`, `list-targets`
 - `validate`
@@ -112,15 +96,7 @@ xcodeproj-cli/
 ### Architectural Considerations
 - Avoid major architectural changes to working features unless explicitly instructed
 - When implementing features, always check existing patterns first
-
-#### Use CUPID for Architectural Decision-Making
-CUPID properties (https://cupid.dev/) focus on creating architectures that are "joyful" to work with. CUPID emphasizes properties rather than rigid rules for architectural design.
-
-- **C - Composable Architecture**: Design system components that harmonize cohesively with minimal dependencies / coupling and clear interfaces / API contracts, framework-agnostic design where possible.
-- **U - Unix Philosophy for Systems**: Apply the Unix philosophy to system boundaries and service design, meaning each service/component does one thing well (single responsibility), appropriate granularity, clear separation between different system concerns, well-defined system boundaries
-- **P - Predictable System Behavior**: Ensure system behavior is consistent and unsurprising, with predictable performance characteristics, well-defined failure modes, clear data flow and state management, and observable and debuggable behavior.
-- **I - Idiomatic Architecture**: Use architecture patterns that are familiar and reduce cognitive load for the development team, including industry-standard architectural patterns, consistent technology choices across the system, familiar deployment and operational patterns, team-appropriate technology selections, and convention-over-configuration approaches.
-- **D - Domain-Aligned Architecture**: Ensure the architecture clearly expresses business concepts and aligns with domain boundaries, including domain-driven design principles, clear separation of business logic from infrastructure concerns, and alignment with business processes and terminology.
+- Follow the modular architecture patterns documented in [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ### Workflow Patterns
 - Focus only on code relevant to the task
@@ -144,7 +120,7 @@ CUPID properties (https://cupid.dev/) focus on creating architectures that are "
 - Make absolutely sure implementations are based on the latest versions of frameworks/libraries
 - Write thorough tests for all major functionality
 
-#### Swft Code Style
+#### Swift Code Style
 - Use Swift naming conventions (PascalCase for types, camelCase for methods)
 - Prefer guard statements for early returns
 
@@ -202,10 +178,10 @@ Before implementing ANY feature, ask:
 
 ```bash
 # Swift code formatting (run after each task)
-swift-format format --in-place --recursive Pomaddoro
+swift-format format --in-place --recursive Sources
 
 # Swift code analysis and linting (run after each task)
-swift-format lint --recursive Pomaddoro
+swift-format lint --recursive Sources
 ```
 
 ### Running Tests
@@ -251,6 +227,8 @@ cd test && ./create_test_project.swift
 - Swift Package Manager caches dependencies after first build
 - Group lookups are recursive but typically fast
 - Large projects (1000+ files) may need optimization
+
+> **⚡ For detailed performance characteristics and caching strategies, see [ARCHITECTURE.md](./ARCHITECTURE.md)**
 
 ## Troubleshooting
 
@@ -315,13 +293,6 @@ ls -la *.xcodeproj.backup
 - Be cautious with build phase scripts
 - Sanitize user input in generated build scripts
 
-### Path Traversal Design Decision
-**Single `..` is intentionally allowed** in path validation for legitimate use cases where files need to be referenced from parent directories (e.g., shared code between projects). This is a deliberate design decision with multiple security layers:
-- Path normalization prevents bypass attempts
-- URL-encoded sequences are decoded and validated
-- Critical system directories are blocked
-- Maximum path length limits prevent resource exhaustion
-- See `PathUtils.sanitizePath()` for implementation details
 
 ## Useful Resources
 
@@ -330,125 +301,23 @@ ls -la *.xcodeproj.backup
 - [Xcode Build Settings Reference](https://developer.apple.com/documentation/xcode/build-settings-reference)
 - [Swift Package Manager](https://swift.org/package-manager/)
 
-## Release Preparation Procedures
+## Release Preparation
 
-### Pre-Release Checklist
+When preparing a release:
+1. Follow the comprehensive checklist in [homebrew/PUBLISHING_CHECKLIST.md](./homebrew/PUBLISHING_CHECKLIST.md)
+2. Ensure version consistency across all files
+3. Run all tests before tagging
+4. Let GitHub Actions handle the build and release
+5. Update Homebrew formula after release is created
 
-Before creating a release, **ALWAYS** complete these steps:
-
-#### 1. Build Verification
-```bash
-# Clean build directory
-rm -rf .build
-
-# Build release version
-swift build -c release
-
-# Test the binary works
-.build/release/xcodeproj-cli --version
-.build/release/xcodeproj-cli --help
-
-# Build universal binary
-./build-universal.sh
-
-# Verify universal binary architectures
-lipo -info xcodeproj-cli
-# Expected output: "Architectures in the fat file: xcodeproj-cli are: x86_64 arm64"
-
-# Test universal binary
-./xcodeproj-cli --version
-```
-
-#### 2. Test Suite Execution
-```bash
-# Run test suite (when available)
-swift test
-
-# Run manual smoke tests
-./xcodeproj-cli --project test/TestData/TestProject.xcodeproj list-targets
-./xcodeproj-cli --project test/TestData/TestProject.xcodeproj validate
-```
-
-#### 3. GitHub Actions Release Workflow Testing
-```bash
-# Test the release workflow locally using act (if installed)
-# Install act: brew install act
-act -n -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest \
-    --secret GITHUB_TOKEN=$GITHUB_TOKEN \
-    -W .github/workflows/release.yml
-
-# Or manually verify the workflow file
-cat .github/workflows/release.yml | grep -E "swift build|lipo|tar|shasum"
-```
-
-#### 4. Version Consistency Check
-```bash
-# Ensure version is updated in all locations:
-grep -n "version.*=.*\"" Sources/xcodeproj-cli/main.swift
-grep "## \[" CHANGELOG.md | head -1
-# Both should show the same version number
-```
-
-#### 5. Documentation Review
-- Ensure README.md is up to date with any new features
-- Update CHANGELOG.md with all changes for the release
-- Verify installation instructions still work
-
-### Release Process
-
-1. **Update Version**
-   ```bash
-   # Update version in Sources/xcodeproj-cli/main.swift
-   # Update CHANGELOG.md with release date
-   ```
-
-2. **Final Build Test**
-   ```bash
-   swift build -c release
-   ./build-universal.sh
-   ```
-
-3. **Commit Changes**
-   ```bash
-   git add -A
-   git commit -m "Release v2.0.0"
-   git push origin main
-   ```
-
-4. **Create Release Tag**
-   ```bash
-   git tag v2.0.0
-   git push origin v2.0.0
-   ```
-
-5. **Monitor GitHub Actions**
-   - Watch the release workflow at: https://github.com/tolo/xcodeproj-cli/actions
-   - Verify the release was created with binary attached
-   - Check the SHA256 hash in the workflow output
-
-6. **Update Homebrew Formula**
-   - Copy SHA256 from GitHub Actions output
-   - Update formula in homebrew-xcodeproj repository
-   - Test installation: `brew upgrade xcodeproj-cli`
-
-### Post-Release Verification
-
-```bash
-# Test Homebrew installation
-brew update
-brew upgrade xcodeproj-cli
-xcodeproj-cli --version  # Should show new version
-
-# Test direct binary download
-curl -L "https://github.com/tolo/xcodeproj-cli/releases/latest/download/xcodeproj-cli-v2.0.0-macos.tar.gz" -o test.tar.gz
-tar -xzf test.tar.gz
-./xcodeproj-cli --version
-rm test.tar.gz xcodeproj-cli
-```
+**Key files to update:**
+- `Sources/xcodeproj-cli/CLI/CLIInterface.swift` - version string
+- `CHANGELOG.md` - change UNRELEASED to version and date
 
 ## Repository
 
 - **GitHub**: https://github.com/tolo/xcodeproj-cli
 - **Issues**: https://github.com/tolo/xcodeproj-cli/issues
 - **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for version history
+- **Architecture**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design
 - **Roadmap**: See [ROADMAP.md](./ROADMAP.md) for planned features and design decisions
