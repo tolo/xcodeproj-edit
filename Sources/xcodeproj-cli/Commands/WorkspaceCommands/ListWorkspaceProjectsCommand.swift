@@ -10,63 +10,89 @@ import PathKit
 import XcodeProj
 
 struct ListWorkspaceProjectsCommand: Command {
-    static var commandName = "list-workspace-projects"
-    static let description = "List all projects in a workspace"
-    
-    let workspaceName: String
-    let verbose: Bool
-    
-    init(arguments: ParsedArguments) throws {
-        guard let name = arguments.positional.first else {
-            throw ProjectError.invalidArguments("Workspace name is required")
-        }
-        
-        self.workspaceName = name
-        self.verbose = arguments.boolFlags.contains("verbose")
+  static var commandName = "list-workspace-projects"
+  static let description = "List all projects in a workspace"
+
+  let workspaceName: String
+  let verbose: Bool
+
+  init(arguments: ParsedArguments) throws {
+    guard let name = arguments.positional.first else {
+      throw ProjectError.invalidArguments("Workspace name is required")
     }
-    
-    func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
-        let workspaceManager = WorkspaceManager()
-        
-        // List projects in workspace
-        let projects = workspaceManager.listWorkspaceProjects(workspaceName: workspaceName)
-        
-        if projects.isEmpty {
-            print("No projects found in workspace '\(workspaceName)'")
+
+    self.workspaceName = name
+    self.verbose = arguments.boolFlags.contains("verbose")
+  }
+
+  func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
+    let workspaceManager = WorkspaceManager()
+
+    // List projects in workspace
+    let projects = workspaceManager.listWorkspaceProjects(workspaceName: workspaceName)
+
+    if projects.isEmpty {
+      print("No projects found in workspace '\(workspaceName)'")
+    } else {
+      print("Projects in workspace '\(workspaceName)':")
+      for (index, project) in projects.enumerated() {
+        if verbose {
+          print("  \(index + 1). \(project)")
         } else {
-            print("Projects in workspace '\(workspaceName)':")
-            for (index, project) in projects.enumerated() {
-                if verbose {
-                    print("  \(index + 1). \(project)")
-                } else {
-                    print("  \(project)")
-                }
-            }
-            
-            if verbose {
-                print("\nTotal projects: \(projects.count)")
-            }
+          print("  \(project)")
         }
+      }
+
+      if verbose {
+        print("\nTotal projects: \(projects.count)")
+      }
     }
+  }
+
+  static func printUsage() {
+    print(
+      """
+      Usage: list-workspace-projects <workspace-name> [options]
+
+      Arguments:
+        workspace-name    Name of the workspace (without .xcworkspace extension)
+
+      Options:
+        --verbose         Show detailed output with numbering and count
+
+      Examples:
+        list-workspace-projects MyWorkspace
+        list-workspace-projects MyWorkspace --verbose
+      """)
+  }
+
+  static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
+    let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
+    try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
+  }
+
+  static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
+    let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
+    let workspaceManager = WorkspaceManager()
     
-    static func printUsage() {
-        print("""
-        Usage: list-workspace-projects <workspace-name> [options]
-        
-        Arguments:
-          workspace-name    Name of the workspace (without .xcworkspace extension)
-        
-        Options:
-          --verbose         Show detailed output with numbering and count
-        
-        Examples:
-          list-workspace-projects MyWorkspace
-          list-workspace-projects MyWorkspace --verbose
-        """)
-    }
+    // List projects in workspace
+    let projects = workspaceManager.listWorkspaceProjects(workspaceName: cmd.workspaceName)
     
-    static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
-        let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
-        try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
+    if projects.isEmpty {
+      print("No projects found in workspace '\(cmd.workspaceName)'")
+    } else {
+      print("Projects in workspace '\(cmd.workspaceName)':")
+      for (index, project) in projects.enumerated() {
+        if cmd.verbose || verbose {
+          print("  \(index + 1). \(project)")
+        } else {
+          print("  \(project)")
+        }
+      }
+      
+      if cmd.verbose || verbose {
+        print("\nTotal projects: \(projects.count)")
+      }
     }
+  }
 }

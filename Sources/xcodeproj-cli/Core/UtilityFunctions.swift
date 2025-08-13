@@ -65,7 +65,7 @@ func fileType(for path: String) -> String {
   case "xml": return "text.xml"
   case "txt": return "text"
   case "md": return "net.daringfireball.markdown"
-  
+
   // Asset/bundle types
   case "xcassets": return "folder.assetcatalog"
   case "bundle": return "wrapper.cfbundle"
@@ -76,7 +76,7 @@ func fileType(for path: String) -> String {
   case "xcworkspace": return "wrapper.workspace"
   case "playground": return "file.playground"
   case "playgroundbook": return "wrapper.playgroundbook"
-  
+
   // Image/media formats
   case "png": return "image.png"
   case "jpg", "jpeg": return "image.jpeg"
@@ -90,29 +90,29 @@ func fileType(for path: String) -> String {
   case "m4a": return "audio.x-m4a"
   case "wav": return "audio.wav"
   case "aiff": return "audio.aiff"
-  
+
   // UI files
   case "storyboard": return "file.storyboard"
   case "xib": return "file.xib"
-  
+
   // Data formats
   case "sqlite": return "file"
   case "db": return "file"
   case "realm": return "file"
   case "coredata": return "wrapper.xcdatamodel"
   case "xcdatamodeld": return "wrapper.xcdatamodel"
-  
+
   // Configuration files
   case "entitlements": return "text.plist.entitlements"
   case "pch": return "sourcecode.c.h"
   case "xcconfig": return "text.xcconfig"
   case "gpx": return "text.xml"
-  
+
   // Archive/compressed formats
   case "zip": return "archive.zip"
   case "tar": return "archive.tar"
   case "gz": return "archive.gzip"
-  
+
   // Documents
   case "rtf": return "text.rtf"
   case "html": return "text.html"
@@ -128,7 +128,7 @@ func fileType(for path: String) -> String {
   case "pl": return "text.script.perl"
   case "php": return "text.script.php"
   case "yaml", "yml": return "text.yaml"
-  
+
   // Development files
   case "gitignore": return "text"
   case "gitmodules": return "text"
@@ -142,7 +142,7 @@ func fileType(for path: String) -> String {
   case "license": return "text"
   case "readme": return "text"
   case "changelog": return "text"
-  
+
   // No extension or unknown types
   default:
     if path.hasSuffix("Podfile") || path.hasSuffix("Cartfile") || path.hasSuffix("Makefile") {
@@ -169,7 +169,7 @@ func shouldIncludeFile(_ filename: String) -> Bool {
     "*.orig", "*.rej", "*.bak", "*.backup",
     "node_modules", ".git", ".svn", ".hg",
     "__pycache__", "*.pyc", ".pytest_cache",
-    "Pods", "Carthage/Build", ".carthage"
+    "Pods", "Carthage/Build", ".carthage",
   ]
 
   for pattern in skipPatterns {
@@ -197,7 +197,8 @@ func findGroupByPath(_ path: String, in groups: [PBXGroup], rootGroup: PBXGroup)
 
   for component in components {
     if let childGroup = currentGroup.children.compactMap({ $0 as? PBXGroup })
-        .first(where: { $0.name == component || $0.path == component }) {
+      .first(where: { $0.name == component || $0.path == component })
+    {
       currentGroup = childGroup
     } else {
       return nil

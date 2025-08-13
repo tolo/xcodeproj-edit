@@ -11,26 +11,28 @@ import XcodeProj
 /// Command for getting build settings from a target
 struct GetBuildSettingsCommand: Command {
   static let commandName = "get-build-settings"
-  
+
   static let description = "Get build settings from a target"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
-    // Validate required arguments
-    try requirePositionalArguments(
-      arguments,
-      count: 1,
-      usage: "get-build-settings requires: <target> [--config <configuration>]"
-    )
+    let targetName: String
+    let configuration = arguments.getFlag("--config", "-c") ?? arguments.getFlag("--configuration")
     
-    let targetName = arguments.positional[0]
-    let configuration = arguments.getFlag("--config", "-c")
-    
+    // Check if target is provided as --targets flag or positional argument
+    if let targetsFlag = arguments.getFlag("--targets") {
+      targetName = targetsFlag
+    } else if arguments.positional.count >= 1 {
+      targetName = arguments.positional[0]
+    } else {
+      throw ProjectError.invalidArguments("get-build-settings requires: <target> [--config <configuration>]")
+    }
+
     // Validate target exists
     try validateTargets([targetName], in: utility)
-    
+
     // Execute the command
     let settings = utility.getBuildSettings(for: targetName, configuration: configuration)
-    
+
     print("🔧 Build settings for \(targetName):")
     if settings.isEmpty {
       print("  No settings found")
@@ -45,30 +47,38 @@ struct GetBuildSettingsCommand: Command {
       }
     }
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       get-build-settings <target> [--config <configuration>]
+      get-build-settings --targets <target> [--config <configuration>]
         Get build settings from a target
         
         Arguments:
-          <target>                  Target name to get settings from
-          --config, -c <config>     Optional: specific configuration name
+          <target>                      Target name (positional)
+          --targets <target>            Target name (flag)
+          --config, -c <config>         Optional: specific configuration name
+          --configuration <config>      Optional: specific configuration name
         
         Examples:
           get-build-settings MyApp
           get-build-settings MyApp --config Debug
+          get-build-settings --targets MyApp --configuration Release
       """)
   }
 }
 
 // MARK: - BaseCommand conformance
 extension GetBuildSettingsCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

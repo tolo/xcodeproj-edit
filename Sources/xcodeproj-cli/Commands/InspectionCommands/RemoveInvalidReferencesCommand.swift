@@ -11,16 +11,17 @@ import XcodeProj
 /// Command for removing invalid file references from the project
 struct RemoveInvalidReferencesCommand: Command {
   static let commandName = "remove-invalid-references"
-  
+
   static let description = "Remove invalid file references from the project"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Execute the command
     utility.removeInvalidReferences()
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       remove-invalid-references
         Remove invalid file references from the project
         

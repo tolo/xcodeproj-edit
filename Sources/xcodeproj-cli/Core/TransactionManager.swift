@@ -12,11 +12,11 @@ import PathKit
 class TransactionManager {
   private let projectPath: Path
   private var transactionBackupPath: Path?
-  
+
   init(projectPath: Path) {
     self.projectPath = projectPath
   }
-  
+
   /// Start a new transaction by creating a backup
   func beginTransaction() throws {
     guard transactionBackupPath == nil else {
@@ -30,7 +30,7 @@ class TransactionManager {
       print("🔄 Transaction started")
     }
   }
-  
+
   /// Commit the transaction by removing the backup
   func commitTransaction() throws {
     guard let backupPath = transactionBackupPath else {
@@ -45,7 +45,7 @@ class TransactionManager {
     transactionBackupPath = nil
     print("✅ Transaction committed")
   }
-  
+
   /// Rollback the transaction by restoring from backup
   func rollbackTransaction() throws {
     guard let backupPath = transactionBackupPath else {
@@ -63,21 +63,22 @@ class TransactionManager {
     transactionBackupPath = nil
     print("↩️  Transaction rolled back")
   }
-  
+
   /// Check if a transaction is currently active
   var hasActiveTransaction: Bool {
     return transactionBackupPath != nil
   }
-  
+
   /// Clean up any leftover transaction files (called on deinit)
   func cleanup() {
     if let backupPath = transactionBackupPath,
-       FileManager.default.fileExists(atPath: backupPath.string) {
+      FileManager.default.fileExists(atPath: backupPath.string)
+    {
       try? FileManager.default.removeItem(atPath: backupPath.string)
       transactionBackupPath = nil
     }
   }
-  
+
   deinit {
     cleanup()
   }

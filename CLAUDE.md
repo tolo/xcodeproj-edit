@@ -32,7 +32,7 @@ xcodeproj-cli --project App.xcodeproj <command>
 # Most common operations
 add-file File.swift Group Target        # Add single file
 add-folder /path/to/folder Group Target --recursive  # Add folder
-create-groups Group/SubGroup           # Create group hierarchy
+create-groups Group/SubGroup          # Create group hierarchy
 list-targets                          # Show all targets
 validate                              # Check project integrity
 ```
@@ -42,7 +42,7 @@ validate                              # Check project integrity
 ```
 xcodeproj-cli/
 ├── Sources/xcodeproj-cli/          # Main implementation
-├── test/                           # Test suite and fixtures
+├── Tests/xcodeproj-cliTests/       # Test suite (136+ tests) with TestResources/
 ├── Package.swift                   # SPM configuration
 ├── build-universal.sh              # Universal binary build
 └── .github/workflows/              # CI/CD automation
@@ -78,9 +78,9 @@ xcodeproj-cli/
 - `add-swift-package`, `remove-swift-package`, `list-swift-packages`
 
 ### Project Structure
-- `create-groups`, `list-groups`
-- `list-files`, `list-targets`
-- `validate`
+- `create-groups`, `list-groups`, `remove-group`
+- `list-files`, `list-targets`, `list-tree`
+- `validate`, `list-invalid-references`, `remove-invalid-references`
 
 
 ## Critical Development Guidelines and Standards
@@ -185,33 +185,61 @@ swift-format lint --recursive Sources
 ```
 
 ### Running Tests
+
+All tests use Swift Package Manager and are located in `Tests/xcodeproj-cliTests/`.
+
 ```bash
-# Quick validation tests (read-only)
-cd test && ./test.sh
+# Run all tests
+swift test
 
-# Full test suite (modifies test project)
-cd test && ./TestSuite.swift
+# Run specific test suite
+swift test --filter ValidationTests    # Read-only validation tests
+swift test --filter FileOperationsTests # File manipulation tests
+swift test --filter BuildAndTargetTests # Target and build tests
+swift test --filter PackageTests        # Swift package tests
+swift test --filter SecurityTests       # Security tests
 
-# Create fresh test project
-cd test && ./create_test_project.swift
+# Run with verbose output
+swift test --verbose
+
+# Run with code coverage
+swift test --enable-code-coverage
+
+# Run tests in parallel
+swift test --parallel
 ```
 
+### Test Categories
+
+- **ValidationTests** - Read-only operations that don't modify projects
+- **FileOperationsTests** - File and folder manipulation
+- **BuildAndTargetTests** - Target management and build settings
+- **PackageTests** - Swift Package Manager integration
+- **IntegrationTests** - Complex multi-command workflows
+- **ComprehensiveTests** - Full feature coverage
+- **SecurityTests** - Path traversal and injection protection
+- **BasicTests** - Core CLI functionality
+- **AdditionalTests** - Edge cases and error handling
+
 ### Adding New Tests
-1. Add test method to appropriate category in TestSuite.swift
-2. Use `test("description") { ... }` helper
-3. Return boolean for success/failure
-4. Ensure test is restorable (doesn't permanently modify test project)
+
+1. Add test methods to appropriate test file in `Tests/xcodeproj-cliTests/`
+2. Use XCTest assertions (`XCTAssertEqual`, `XCTAssertTrue`, etc.)
+3. Use `TestHelpers` for common operations
+4. Ensure tests are independent and restorable
+5. Test both success and failure cases
 
 
 ## Common Tasks
 
 ### Adding a New Command
-1. Add command case to main switch statement
-2. Implement handler function with proper error handling
-3. Add validation for required parameters
-4. Update help text with new command
-5. Add test coverage in TestSuite.swift or suitable test file
-6. Document in README.md
+1. Create command class implementing `Command` protocol in appropriate category folder
+2. Register command in `CommandRegistry.swift`
+3. Implement execute method with proper error handling
+4. Add validation for required parameters
+5. Update help text with usage information
+6. Add test coverage in appropriate test file in `Tests/xcodeproj-cliTests/`
+7. Document in README.md
 
 ### Debugging Issues
 - Use `print()` statements for debug output

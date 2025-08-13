@@ -9,7 +9,7 @@ import Foundation
 
 /// Utility for detecting Xcode file types based on file extensions
 struct FileTypeDetector {
-  
+
   /// Determine the appropriate Xcode file type for a given file path
   static func fileType(for path: String) -> String {
     switch (path as NSString).pathExtension.lowercased() {

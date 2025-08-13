@@ -11,28 +11,29 @@ import XcodeProj
 /// Command for creating group hierarchies in the project
 struct CreateGroupsCommand: Command {
   static let commandName = "create-groups"
-  
+
   static let description = "Create group hierarchies in the project"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     guard !arguments.positional.isEmpty else {
       throw ProjectError.invalidArguments("create-groups requires: <group1> [group2] ...")
     }
-    
+
     // Create all specified groups
     utility.createGroups(arguments.positional)
-    
+
     // Save changes
     try utility.save()
-    
+
     for groupPath in arguments.positional {
       print("✅ Created group hierarchy: \(groupPath)")
     }
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       create-groups <group1> [group2] ...
         Create group hierarchies in the project
         

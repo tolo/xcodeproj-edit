@@ -11,38 +11,39 @@ import XcodeProj
 /// Command for adding a build phase to a target
 struct AddBuildPhaseCommand: Command {
   static let commandName = "add-build-phase"
-  
+
   static let description = "Add a build phase to a target"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 2, 
+      arguments,
+      count: 2,
       usage: "add-build-phase requires: <type> <name> --target <target> [--script <script>]"
     )
-    
+
     let type = arguments.positional[0]
     let name = arguments.positional[1]
-    
+
     // Get required target flag
     let targetName = try arguments.requireFlag(
-      "--target", "-t", 
+      "--target", "-t",
       error: "add-build-phase requires --target or -t flag"
     )
-    
+
     // Get optional script flag
     let script = arguments.getFlag("--script", "-s")
-    
+
     // Validate target exists
     try validateTargets([targetName], in: utility)
-    
+
     // Execute the command
     try utility.addBuildPhase(type: type, name: name, to: targetName, script: script)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       add-build-phase <type> <name> --target <target> [--script <script>]
         Add a build phase to a target
         
@@ -67,11 +68,14 @@ struct AddBuildPhaseCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddBuildPhaseCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

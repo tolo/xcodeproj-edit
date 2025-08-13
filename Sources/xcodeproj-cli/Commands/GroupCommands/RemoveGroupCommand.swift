@@ -11,9 +11,9 @@ import XcodeProj
 /// Command for removing groups and their contents from the project
 struct RemoveGroupCommand: Command {
   static let commandName = "remove-group"
-  
+
   static let description = "Remove a group and its contents from the project"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
@@ -21,18 +21,19 @@ struct RemoveGroupCommand: Command {
       count: 1,
       usage: "remove-group requires: <group-path>"
     )
-    
+
     let groupPath = arguments.positional[0]
-    
+
     // Execute the command
     try utility.removeGroup(groupPath)
-    
+
     // Save changes
     try utility.save()
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       remove-group <group-path>
         Remove a group and its contents from the project
         
@@ -50,7 +51,9 @@ struct RemoveGroupCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveGroupCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 }

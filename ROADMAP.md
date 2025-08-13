@@ -1,17 +1,19 @@
 # xcodeproj-cli Roadmap
 
-## Current Status: v2.0.0 (In Development)
+## Current Status: v2.0.0 (Released)
 
-Major release featuring complete service-based architecture, comprehensive scheme management, workspace support, and 35+ new commands. See [Issue #6](https://github.com/tolo/xcodeproj-cli/issues/6) for full implementation details.
+Major release featuring complete service-based architecture, comprehensive scheme management, workspace support, and 35+ new commands with 136+ tests using Swift Package Manager. All planned v2.0.0 features have been implemented and released.
 
-### v2.0.0 Feature Completeness
-- [ ] Complete migration from XcodeProjUtility to specialized services
-- [ ] Scheme management (create, configure, test coverage)
-- [ ] Workspace support with cross-project references
-- [ ] Enhanced build phases (headers, copy destinations, run scripts)
-- [ ] Build configuration management with .xcconfig support
-- [ ] Localization and variant groups
-- [ ] Extended target types (aggregate, extensions)
+### ✅ v2.0.0 Feature Completeness - COMPLETED
+- ✅ Complete migration from XcodeProjUtility to specialized services
+- ✅ Scheme management (7 commands: create, configure, test coverage, etc.)
+- ✅ Workspace support with cross-project references (5+ commands)
+- ✅ Enhanced build phases (headers, copy destinations, run scripts)
+- ✅ Build configuration management with .xcconfig support
+- ✅ Localization and variant groups
+- ✅ Extended target types (aggregate, extensions)
+- ✅ Swift Package Manager test integration (136+ tests)
+- ✅ Performance optimizations and intelligent caching
 
 ---
 

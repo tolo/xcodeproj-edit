@@ -8,7 +8,7 @@
 
 /*
  * EXAMPLE REFACTORING PATTERN
- * 
+ *
  * This shows how to replace XcodeProjUtility with XcodeProjService in main.swift:
  *
  * OLD CODE (in main.swift around line 2729):
@@ -70,7 +70,7 @@
  * ```
  *
  * BENEFITS OF THE NEW ARCHITECTURE:
- * 
+ *
  * 1. Clean separation of concerns - each service has a single responsibility
  * 2. Better testability - services can be mocked and tested independently
  * 3. Performance improvements - built-in caching for groups and targets
@@ -95,16 +95,18 @@ import XcodeProj
 func exampleCommandHandler() throws {
   // Initialize the service (replaces XcodeProjUtility)
   let service = try XcodeProjService(path: "MyProject.xcodeproj")
-  
+
   // Example: Add a file
   try service.addFile(path: "NewFile.swift", to: "Sources", targets: ["MyApp"])
-  
+
   // Example: Create groups
   service.createGroups(["Sources/Features", "Sources/Utils"])
-  
+
   // Example: Add target
-  try service.addTarget(name: "MyNewTarget", productType: "com.apple.product-type.application", bundleId: "com.example.mynewapp")
-  
+  try service.addTarget(
+    name: "MyNewTarget", productType: "com.apple.product-type.application",
+    bundleId: "com.example.mynewapp")
+
   // Example: Validation
   let issues = service.validate()
   if !issues.isEmpty {
@@ -113,10 +115,10 @@ func exampleCommandHandler() throws {
       print("  - \(issue)")
     }
   }
-  
+
   // Example: Set build settings
   try service.setBuildSetting(key: "SWIFT_VERSION", value: "5.0", targets: ["MyApp"])
-  
+
   // Save changes
   try service.save()
 }

@@ -28,7 +28,10 @@ let package = Package(
         .testTarget(
             name: "xcodeproj-cliTests",
             dependencies: ["xcodeproj-cli"],
-            path: "Tests/xcodeproj-cliTests"
+            path: "Tests/xcodeproj-cliTests",
+            exclude: [
+                "TestResources"
+            ]
         ),
     ]
 )

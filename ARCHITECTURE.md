@@ -119,13 +119,14 @@ CLI Arguments → CLIRunner → CommandRegistry → Command → Core Services �
 ## Testing Strategy
 
 ### Integration Testing Focus
-Tests use real Xcode projects for end-to-end validation, ensuring complete command execution paths and state verification with transaction safety testing.
+Tests use real Xcode projects for end-to-end validation, ensuring complete command execution paths and state verification with transaction safety testing. All 136+ tests are implemented using Swift Package Manager's testing framework.
 
 ### Test Organization
-- Feature-based organization grouped by functional area
-- Independent tests with restorable state
-- Coverage of both success and failure scenarios
-- Performance and scalability validation
+- **Swift Package Manager Integration**: Tests/xcodeproj-cliTests/ with native Swift testing
+- **Feature-based organization**: 9 test suites grouped by functional area
+- **Independent tests**: Each test has restorable state
+- **Comprehensive coverage**: Both success and failure scenarios
+- **Performance validation**: Timing and scalability testing included
 
 ## Security Considerations
 

@@ -11,42 +11,43 @@ import XcodeProj
 /// Command for adding a synchronized folder that maintains sync with filesystem
 struct AddSyncFolderCommand: Command {
   static let commandName = "add-sync-folder"
-  
+
   static let description = "Add a synchronized folder that maintains sync with filesystem"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 1, 
+      arguments,
+      count: 1,
       usage: "add-sync-folder requires: <folder-path> --group <group> --targets <target1,target2>"
     )
-    
+
     let folderPath = arguments.positional[0]
-    
+
     // Get required flags
     let group = try arguments.requireFlag(
-      "--group", "-g", 
+      "--group", "-g",
       error: "add-sync-folder requires --group or -g flag"
     )
-    
+
     let targetsStr = try arguments.requireFlag(
-      "--targets", "-t", 
+      "--targets", "-t",
       error: "add-sync-folder requires --targets or -t flag"
     )
-    
+
     let targets = parseTargets(from: targetsStr)
-    
+
     // Validate inputs
     try validateGroup(group, in: utility)
     try validateTargets(targets, in: utility)
-    
+
     // Execute the command
     try utility.addSynchronizedFolder(folderPath: folderPath, to: group, targets: targets)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       add-sync-folder <folder-path> --group <group> --targets <target1,target2>
         Add a synchronized folder that maintains sync with filesystem
         
@@ -69,18 +70,21 @@ struct AddSyncFolderCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddSyncFolderCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
+
   private static func parseTargets(from targetsString: String) -> [String] {
     return BaseCommand.parseTargets(from: targetsString)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
-  
+
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

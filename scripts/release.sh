@@ -25,7 +25,7 @@ sed -i '' "s/## \[UNRELEASED\].*/## [$VERSION] - $TODAY/" CHANGELOG.md
 
 # Step 3: Run tests
 echo "🧪 Running tests..."
-./test/test.sh validation
+swift test
 
 # Step 4: Build universal binary
 echo "🔨 Building universal binary..."

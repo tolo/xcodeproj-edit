@@ -10,17 +10,17 @@ import XcodeProj
 
 class BuildPhaseManager {
   private let pbxproj: PBXProj
-  
+
   init(pbxproj: PBXProj) {
     self.pbxproj = pbxproj
   }
-  
+
   // MARK: - Build File Collection
-  
+
   /// Finds all build files that reference the given file reference
   func findBuildFiles(for fileReference: PBXFileReference) -> Set<PBXBuildFile> {
     var buildFiles: Set<PBXBuildFile> = []
-    
+
     for target in pbxproj.nativeTargets {
       for buildPhase in target.buildPhases {
         let phaseFiles = getBuildPhaseFiles(buildPhase)
@@ -29,10 +29,10 @@ class BuildPhaseManager {
         }
       }
     }
-    
+
     return buildFiles
   }
-  
+
   /// Removes build files that match the given predicate from all build phases
   func removeBuildFiles(matching predicate: (PBXBuildFile) -> Bool) {
     for target in pbxproj.nativeTargets {
@@ -41,14 +41,14 @@ class BuildPhaseManager {
       }
     }
   }
-  
+
   /// Removes build files for the given file reference from all build phases
   func removeBuildFiles(for fileReference: PBXFileReference) {
     removeBuildFiles { buildFile in
       buildFile.file === fileReference
     }
   }
-  
+
   /// Adds a file to appropriate build phases based on file type
   func addFileToBuildPhases(
     fileReference: PBXFileReference,
@@ -60,14 +60,14 @@ class BuildPhaseManager {
         print("⚠️  Target '\(targetName)' not found")
         continue
       }
-      
+
       if isCompilable {
         // Add to sources build phase
         guard let sourcesBuildPhase = XcodeProjectHelpers.sourceBuildPhase(for: target) else {
           print("⚠️  Target '\(targetName)' has no sources build phase")
           continue
         }
-        
+
         let buildFile = PBXBuildFile(file: fileReference)
         pbxproj.add(object: buildFile)
         sourcesBuildPhase.files?.append(buildFile)
@@ -83,9 +83,9 @@ class BuildPhaseManager {
       }
     }
   }
-  
+
   // MARK: - Private Helpers
-  
+
   /// Gets all files from a build phase, regardless of phase type
   private func getBuildPhaseFiles(_ buildPhase: PBXBuildPhase) -> [PBXBuildFile] {
     switch buildPhase {
@@ -101,9 +101,11 @@ class BuildPhaseManager {
       return []
     }
   }
-  
+
   /// Removes build files from a specific build phase that match the predicate
-  private func removeBuildFilesFromPhase(_ buildPhase: PBXBuildPhase, matching predicate: (PBXBuildFile) -> Bool) {
+  private func removeBuildFilesFromPhase(
+    _ buildPhase: PBXBuildPhase, matching predicate: (PBXBuildFile) -> Bool
+  ) {
     switch buildPhase {
     case let sourcesBuildPhase as PBXSourcesBuildPhase:
       sourcesBuildPhase.files?.removeAll(where: predicate)

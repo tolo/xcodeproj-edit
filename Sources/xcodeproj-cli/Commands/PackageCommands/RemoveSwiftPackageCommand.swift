@@ -11,9 +11,9 @@ import XcodeProj
 /// Command for removing Swift Package dependencies from the project
 struct RemoveSwiftPackageCommand: Command {
   static let commandName = "remove-swift-package"
-  
+
   static let description = "Remove Swift Package dependency from the project"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
@@ -21,18 +21,19 @@ struct RemoveSwiftPackageCommand: Command {
       count: 1,
       usage: "remove-swift-package requires: <url>"
     )
-    
+
     let url = arguments.positional[0]
-    
+
     // Execute the command
     try utility.removeSwiftPackage(url: url)
-    
+
     // Save changes
     try utility.save()
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       remove-swift-package <url>
         Remove Swift Package dependency from the project
         
@@ -47,7 +48,9 @@ struct RemoveSwiftPackageCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveSwiftPackageCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 }

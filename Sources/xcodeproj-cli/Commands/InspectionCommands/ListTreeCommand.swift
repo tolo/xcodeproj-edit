@@ -11,15 +11,16 @@ import XcodeProj
 /// Command for listing the complete project structure as a tree
 struct ListTreeCommand: Command {
   static let commandName = "list-tree"
-  
+
   static let description = "List the complete project structure as a tree"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     utility.listProjectTree()
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       list-tree
         List the complete project structure as a tree
         

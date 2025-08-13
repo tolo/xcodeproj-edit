@@ -11,7 +11,7 @@
 - [ ] Ensure all PRs are merged to main
 - [ ] Update CHANGELOG.md - change `[UNRELEASED]` to `[X.Y.Z] - YYYY-MM-DD`
 - [ ] Verify version in `Sources/xcodeproj-cli/CLI/CLIInterface.swift` is "X.Y.Z"
-- [ ] Run final tests: `./test/test.sh all`
+- [ ] Run final tests: `swift test`
 - [ ] Build and test universal binary: `./build-universal.sh`
 
 ### Step 2: Create Git Tag and Trigger Release

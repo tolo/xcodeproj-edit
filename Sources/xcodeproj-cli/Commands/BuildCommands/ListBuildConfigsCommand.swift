@@ -11,23 +11,24 @@ import XcodeProj
 /// Command for listing build configurations for a target or the project
 struct ListBuildConfigsCommand: Command {
   static let commandName = "list-build-configs"
-  
+
   static let description = "List build configurations for a target or the project"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let targetName = arguments.getFlag("--target", "-t")
-    
+
     // If target is specified, validate it exists
     if let target = targetName {
       try validateTargets([target], in: utility)
     }
-    
+
     // Execute the command
     utility.listBuildConfigurations(for: targetName)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       list-build-configs [--target <target>]
         List build configurations for a target or the project
         
@@ -43,7 +44,8 @@ struct ListBuildConfigsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension ListBuildConfigsCommand {
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

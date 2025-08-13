@@ -4,7 +4,7 @@
 
 A powerful command-line utility for manipulating Xcode project files (.xcodeproj) without requiring Xcode or Docker. Designed for both **human developers** and **AI coding assistants** (like Claude Code, GitHub Copilot, and other LLM-based tools) to automate Xcode project management.
 
-**Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 55+ specialized modules, comprehensive test suites, and `--verbose` flag for detailed operation insights.
+**Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 45 commands and 55+ specialized modules, comprehensive test suite with 136+ tests, and `--verbose` flag for detailed operation insights.
 
 ## Acknowledgments
 
@@ -739,15 +739,58 @@ swift build -c release
 cp -r PhotoEditor.xcodeproj PhotoEditor.xcodeproj.backup
 ```
 
+## Testing
+
+The project includes a comprehensive test suite with 136+ tests covering all functionality using Swift Package Manager.
+
+### Running Tests
+
+```bash
+# Run all tests using Swift Package Manager
+swift test
+
+# Run specific test suites
+swift test --filter ValidationTests      # Read-only validation tests
+swift test --filter FileOperationsTests  # File manipulation tests
+swift test --filter BuildAndTargetTests  # Target and build tests
+swift test --filter PackageTests         # Swift package tests
+swift test --filter SecurityTests        # Security tests
+
+# Run with code coverage
+swift test --enable-code-coverage
+
+# Run tests in parallel for faster execution
+swift test --parallel
+```
+
+### Test Categories
+
+- **BasicTests** - Core CLI functionality
+- **ValidationTests** - Read-only operations that don't modify projects
+- **FileOperationsTests** - File and folder manipulation  
+- **BuildAndTargetTests** - Target management and build settings
+- **ComprehensiveTests** - Full feature coverage tests
+- **IntegrationTests** - Complex multi-command workflows
+- **PackageTests** - Swift Package Manager integration
+- **SecurityTests** - Path traversal and injection protection
+- **AdditionalTests** - Edge cases and error handling
+
 ## Contributing
 
 This tool is open for improvements! Feel free to:
 
-1. Add new commands for specific workflows
-2. Enhance error messages
-3. Add more file type support
-4. Improve performance
-5. Add tests
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass (`swift test`)
+5. Submit a pull request
+
+Areas for contribution:
+- Add new commands for specific workflows
+- Enhance error messages
+- Add more file type support
+- Improve performance
+- Expand test coverage
 
 ## License
 
@@ -771,12 +814,20 @@ xcodeproj-cli/
 ├── .github/
 │   └── workflows/
 │       └── release.yml        # Automated release workflow
-├── test/
-│   ├── TestSuite.swift        # Comprehensive test suite
-│   ├── SecurityTests.swift    # Security-focused test coverage
-│   ├── AdditionalTests.swift  # Extended test scenarios
-│   └── TestData/
-│       └── TestProject.xcodeproj/  # Test project for validation
+├── Tests/
+│   └── xcodeproj-cliTests/    # Swift Package Manager tests (136+ tests)
+│       ├── BasicTests.swift           # Core functionality tests
+│       ├── FileOperationsTests.swift  # File manipulation tests
+│       ├── BuildAndTargetTests.swift  # Target and build configuration tests
+│       ├── ComprehensiveTests.swift   # Complete feature coverage tests
+│       ├── ValidationTests.swift      # Project validation tests
+│       ├── IntegrationTests.swift     # Complex workflow tests
+│       ├── PackageTests.swift         # Swift Package Manager tests
+│       ├── SecurityTests.swift        # Security-focused test coverage
+│       ├── AdditionalTests.swift      # Extended test scenarios
+│       ├── TestHelpers.swift          # Shared test utilities
+│       └── TestResources/             # Test project and sample files
+│           └── TestProject.xcodeproj/ # Test project for validation
 ├── README.md                  # This file
 ├── CHANGELOG.md              # Version history and changes
 ├── LICENSE                   # MIT License

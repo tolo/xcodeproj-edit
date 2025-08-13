@@ -52,7 +52,7 @@ struct CLIInterface {
       """
     )
   }
-  
+
   static func printVersion() {
     print("xcodeproj-cli version \(version)")
   }
