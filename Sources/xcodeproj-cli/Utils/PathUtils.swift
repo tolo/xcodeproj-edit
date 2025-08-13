@@ -39,7 +39,7 @@ struct PathUtils {
       for component in components {
         if component == ".." {
           depth -= 1
-          if depth < -1 { // Allow one level up but not more
+          if depth < 0 { // Never allow going above project root
             return nil
           }
         } else if !component.isEmpty && component != "." {

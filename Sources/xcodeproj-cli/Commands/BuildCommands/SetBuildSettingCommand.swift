@@ -25,6 +25,11 @@ struct SetBuildSettingCommand: Command {
     let key = arguments.positional[0]
     let value = arguments.positional[1]
     
+    // Validate build setting for security
+    guard SecurityUtils.validateBuildSetting(key: key, value: value) else {
+      throw ProjectError.invalidArguments("Build setting '\(key)' contains potentially dangerous value")
+    }
+    
     // Get required flags
     let targetsStr = try arguments.requireFlag(
       "--targets", "-t",

@@ -50,8 +50,14 @@ class CacheManager {
     groupCache.removeAll()
     groupPathCache.removeAll()
     
-    guard let rootGroup = try? pbxproj.rootGroup() else { return }
-    buildGroupCache(from: rootGroup, currentPath: "")
+    // Proper error handling for rootGroup access
+    do {
+      let rootGroup = try pbxproj.rootGroup()
+      buildGroupCache(from: rootGroup, currentPath: "")
+    } catch {
+      // Log the error but continue - cache will be empty but not fatal
+      print("⚠️  Unable to build group cache: \(error)")
+    }
   }
   
   private func buildGroupCache(from group: PBXGroup, currentPath: String) {

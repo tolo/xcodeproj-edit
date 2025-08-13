@@ -163,7 +163,15 @@ class XcodeProjService {
     }
     
     let pathComponents = path.split(separator: "/").map(String.init)
-    guard let rootGroup = try? pbxproj.rootGroup() else { return nil }
+    
+    // Proper error handling for rootGroup access
+    let rootGroup: PBXGroup
+    do {
+      rootGroup = try pbxproj.rootGroup()
+    } catch {
+      print("⚠️  Unable to access project root group: \(error)")
+      return nil
+    }
     var currentGroup = rootGroup
     
     for component in pathComponents {

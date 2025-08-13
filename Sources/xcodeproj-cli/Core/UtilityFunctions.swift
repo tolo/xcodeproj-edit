@@ -12,28 +12,8 @@ import XcodeProj
 // MARK: - Security & Path Helpers
 
 func sanitizePath(_ path: String) -> String? {
-  // Block obvious path traversal attempts that try to escape project boundaries
-  if path.contains("../..") || path.contains("..\\..") {
-    // Allow single ../ for referencing parent directories within project
-    // but block multiple levels that could escape project root
-    return nil
-  }
-
-  // For absolute paths, only block critical system directories
-  // This allows adding files from user directories while protecting system
-  if path.hasPrefix("/") {
-    let criticalPaths = ["/etc/passwd", "/etc/shadow", "/private/etc", "/System/Library"]
-    for critical in criticalPaths {
-      if path.hasPrefix(critical) {
-        return nil
-      }
-    }
-  }
-
-  // Allow ~ expansion as coding agents may use it
-  // The shell will handle the actual expansion
-
-  return path
+  // Use the centralized, secure implementation from PathUtils
+  return PathUtils.sanitizePath(path)
 }
 
 func escapeShellCommand(_ command: String) -> String {

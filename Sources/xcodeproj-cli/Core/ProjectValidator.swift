@@ -60,8 +60,11 @@ class ProjectValidator {
     let projectDir = projectPath.parent()
 
     // Check each file reference recursively
-    if let rootGroup = try? pbxproj.rootGroup() {
+    do {
+      let rootGroup = try pbxproj.rootGroup()
       checkFilesInGroup(rootGroup, groupPath: "", projectDir: projectDir, fileManager: fileManager, invalidRefs: &invalidRefs)
+    } catch {
+      print("⚠️  Unable to access project root group: \(error)")
     }
 
     // Report results
@@ -91,8 +94,11 @@ class ProjectValidator {
     var groupsToRemove: [PBXGroup] = []
 
     // Start checking from root group
-    if let rootGroup = try? pbxproj.rootGroup() {
+    do {
+      let rootGroup = try pbxproj.rootGroup()
       findInvalidFilesInGroup(rootGroup, projectDir: projectDir, fileManager: fileManager, refsToRemove: &refsToRemove, groupsToRemove: &groupsToRemove)
+    } catch {
+      print("⚠️  Unable to access project root group: \(error)")
     }
 
     // Remove invalid groups
