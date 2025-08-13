@@ -85,7 +85,7 @@ extension AddTargetCommand {
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
+
   /// Validate that the product type is a known/supported type
   private static func validateProductType(_ productType: String) throws {
     let validProductTypes: Set<String> = [
@@ -99,28 +99,28 @@ extension AddTargetCommand {
       "watch-extension", "watch2-extension",
       "tv-app", "tv-extension",
       "xpc-service",
-      "command-line-tool"
+      "command-line-tool",
     ]
-    
+
     // Also check against actual XcodeProj product type constants
     let knownProductTypes = [
       "com.apple.product-type.application",
       "com.apple.product-type.framework",
       "com.apple.product-type.library.static",
-      "com.apple.product-type.library.dynamic", 
+      "com.apple.product-type.library.dynamic",
       "com.apple.product-type.bundle.unit-test",
       "com.apple.product-type.bundle.ui-testing",
       "com.apple.product-type.app-extension",
       "com.apple.product-type.bundle",
       "com.apple.product-type.watchkit-app",
-      "com.apple.product-type.watchkit2-app", 
+      "com.apple.product-type.watchkit2-app",
       "com.apple.product-type.watchkit-extension",
       "com.apple.product-type.watchkit2-extension",
       "com.apple.product-type.tv-app-extension",
       "com.apple.product-type.application.watchapp2",
-      "com.apple.product-type.tool"
+      "com.apple.product-type.tool",
     ]
-    
+
     if !validProductTypes.contains(productType) && !knownProductTypes.contains(productType) {
       throw ProjectError.invalidArguments(
         "Invalid product type '\(productType)'. Supported types: \(validProductTypes.sorted().joined(separator: ", "))"

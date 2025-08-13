@@ -16,7 +16,7 @@ struct UpdateSwiftPackagesCommand: Command {
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let forceUpdate = arguments.hasFlag("--force", "-f")
-    
+
     // Execute the command
     try utility.updateSwiftPackages(force: forceUpdate)
 

@@ -15,12 +15,31 @@ class SchemeManager {
   private let projectPath: Path
   private let pbxproj: PBXProj
   private let schemesPath: Path
+  private let transactionManager: TransactionManager
 
   init(xcodeproj: XcodeProj, projectPath: Path) {
     self.xcodeproj = xcodeproj
     self.projectPath = projectPath
     self.pbxproj = xcodeproj.pbxproj
     self.schemesPath = projectPath + "xcshareddata/xcschemes"
+    self.transactionManager = TransactionManager(projectPath: projectPath)
+  }
+
+  // MARK: - Transaction Support
+
+  /// Begins a transaction for scheme modifications
+  func beginTransaction() throws {
+    try transactionManager.beginTransaction()
+  }
+
+  /// Commits the current transaction
+  func commitTransaction() throws {
+    try transactionManager.commitTransaction()
+  }
+
+  /// Rolls back the current transaction
+  func rollbackTransaction() throws {
+    try transactionManager.rollbackTransaction()
   }
 
   // MARK: - Scheme Creation
@@ -66,11 +85,15 @@ class SchemeManager {
     let testAction: XCScheme.TestAction?
 
     if !testTargets.isEmpty {
+      guard let firstTestTarget = testTargets.first else {
+        throw ProjectError.operationFailed("Test targets array is empty despite isEmpty check")
+      }
+
       let testBuildableReference = XCScheme.BuildableReference(
         referencedContainer: "container:\(projectPath.lastComponent)",
-        blueprint: testTargets.first!,
-        buildableName: testTargets.first!.productNameWithExtension() ?? testTargets.first!.name,
-        blueprintName: testTargets.first!.name
+        blueprint: firstTestTarget,
+        buildableName: firstTestTarget.productNameWithExtension() ?? firstTestTarget.name,
+        blueprintName: firstTestTarget.name
       )
 
       testAction = XCScheme.TestAction(
@@ -165,7 +188,7 @@ class SchemeManager {
     let schemePath = schemesPath + "\(name).xcscheme"
 
     guard schemePath.exists else {
-      throw ProjectError.operationFailed("Scheme '\(name)' not found")
+      throw ProjectError.schemeNotFound(name)
     }
 
     try schemePath.delete()
@@ -173,11 +196,11 @@ class SchemeManager {
   }
 
   /// Lists all schemes
-  func listSchemes(shared: Bool = true) -> [String] {
+  func listSchemes(shared: Bool = true) throws -> [String] {
     let path = shared ? schemesPath : projectPath + "xcuserdata"
 
     guard path.exists else {
-      return []
+      return []  // Return empty array if directory doesn't exist yet (valid case)
     }
 
     do {
@@ -186,7 +209,7 @@ class SchemeManager {
         .map { $0.lastComponentWithoutExtension }
       return schemes
     } catch {
-      return []
+      throw ProjectError.operationFailed("Failed to list schemes: \(error.localizedDescription)")
     }
   }
 
@@ -369,10 +392,14 @@ class SchemeManager {
     let schemePath = schemesPath + "\(name).xcscheme"
 
     guard schemePath.exists else {
-      throw ProjectError.operationFailed("Scheme '\(name)' not found")
+      throw ProjectError.schemeNotFound(name)
     }
 
-    return try XCScheme(path: schemePath)
+    do {
+      return try XCScheme(path: schemePath)
+    } catch {
+      throw ProjectError.schemeLoadFailed(name, error)
+    }
   }
 
   private func saveSharedScheme(_ scheme: XCScheme) throws {
@@ -386,7 +413,13 @@ class SchemeManager {
   }
 
   private func saveUserScheme(_ scheme: XCScheme) throws {
-    let userSchemesPath = projectPath + "xcuserdata/\(NSUserName()).xcuserdatad/xcschemes"
+    let userName = NSUserName()
+    guard !userName.isEmpty else {
+      throw ProjectError.operationFailed(
+        "Unable to determine current user name for user scheme path")
+    }
+
+    let userSchemesPath = projectPath + "xcuserdata/\(userName).xcuserdatad/xcschemes"
 
     // Ensure user schemes directory exists
     if !userSchemesPath.exists {

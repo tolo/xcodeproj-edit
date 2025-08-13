@@ -17,13 +17,8 @@ func sanitizePath(_ path: String) -> String? {
 }
 
 func escapeShellCommand(_ command: String) -> String {
-  // Escape common shell metacharacters
-  let charactersToEscape = ["$", "`", "\\", "\"", "\n"]
-  var escaped = command
-  for char in charactersToEscape {
-    escaped = escaped.replacingOccurrences(of: char, with: "\\\(char)")
-  }
-  return escaped
+  // Use the centralized, secure implementation from SecurityUtils
+  return SecurityUtils.escapeShellCommand(command)
 }
 
 // MARK: - Project Helper Functions

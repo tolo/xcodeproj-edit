@@ -23,7 +23,7 @@ struct MoveFileCommand: Command {
     )
 
     let filePath = arguments.positional[0]
-    
+
     // Check if moving to a different group
     if let targetGroup = arguments.flags["--to-group"] {
       // Move file to a different group
@@ -33,7 +33,8 @@ struct MoveFileCommand: Command {
       let newPath = arguments.positional[1]
       try utility.moveFile(from: filePath, to: newPath)
     } else {
-      throw ProjectError.invalidArguments("move-file requires either --to-group <group> or <new-path>")
+      throw ProjectError.invalidArguments(
+        "move-file requires either --to-group <group> or <new-path>")
     }
   }
 

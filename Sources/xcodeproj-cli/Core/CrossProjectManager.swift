@@ -14,11 +14,30 @@ class CrossProjectManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
   private let pbxproj: PBXProj
+  private let transactionManager: TransactionManager
 
   init(xcodeproj: XcodeProj, projectPath: Path) {
     self.xcodeproj = xcodeproj
     self.projectPath = projectPath
     self.pbxproj = xcodeproj.pbxproj
+    self.transactionManager = TransactionManager(projectPath: projectPath)
+  }
+
+  // MARK: - Transaction Support
+
+  /// Begins a transaction for cross-project modifications
+  func beginTransaction() throws {
+    try transactionManager.beginTransaction()
+  }
+
+  /// Commits the current transaction
+  func commitTransaction() throws {
+    try transactionManager.commitTransaction()
+  }
+
+  /// Rolls back the current transaction
+  func rollbackTransaction() throws {
+    try transactionManager.rollbackTransaction()
   }
 
   // MARK: - Project References
@@ -28,8 +47,8 @@ class CrossProjectManager {
     externalProjectPath: String,
     groupPath: String? = nil
   ) throws -> PBXFileReference {
-    // Use path as-is for now (simplified approach)
-    let resolvedPath = externalProjectPath
+    // Validate external project path for security
+    let resolvedPath = try PathUtils.validatePath(externalProjectPath)
 
     // Check if reference already exists
     if let existingRef = pbxproj.fileReferences.first(where: {
@@ -42,12 +61,12 @@ class CrossProjectManager {
     // Find or create the group
     let group: PBXGroup
     if let groupPath = groupPath {
-      guard let existingGroup = findOrCreateGroup(path: groupPath) else {
-        throw ProjectError.groupNotFound(groupPath)
-      }
-      group = existingGroup
+      group = try findOrCreateGroup(path: groupPath)
     } else {
-      group = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first!
+      guard let mainGroup = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first else {
+        throw ProjectError.operationFailed("No main group or root groups found in project")
+      }
+      group = mainGroup
     }
 
     // Create file reference for the external project
@@ -201,9 +220,11 @@ class CrossProjectManager {
   }
 
   /// Lists all cross-project dependencies for a target
-  func listCrossProjectDependencies(targetName: String) -> [(project: String, target: String)] {
+  func listCrossProjectDependencies(targetName: String) throws -> [(
+    project: String, target: String
+  )] {
     guard let target = pbxproj.targets(named: targetName).first else {
-      return []
+      throw ProjectError.targetNotFound(targetName)
     }
 
     var dependencies: [(project: String, target: String)] = []
@@ -230,14 +251,20 @@ class CrossProjectManager {
     }
   }
 
-  private func findOrCreateGroup(path: String) -> PBXGroup? {
+  private func findOrCreateGroup(path: String) throws -> PBXGroup {
     let components = path.split(separator: "/").map(String.init)
 
     guard !components.isEmpty else {
-      return pbxproj.rootObject?.mainGroup
+      guard let mainGroup = pbxproj.rootObject?.mainGroup else {
+        throw ProjectError.operationFailed("No main group found in project")
+      }
+      return mainGroup
     }
 
-    var currentGroup = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first!
+    guard let startingGroup = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first else {
+      throw ProjectError.operationFailed("No main group or groups found in project")
+    }
+    var currentGroup = startingGroup
 
     for component in components {
       if let existingGroup = currentGroup.children.compactMap({ $0 as? PBXGroup }).first(where: {

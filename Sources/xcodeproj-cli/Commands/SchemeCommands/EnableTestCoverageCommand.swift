@@ -40,7 +40,7 @@ struct EnableTestCoverageCommand: Command {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 
     // Check if scheme exists
-    let existingSchemes = schemeManager.listSchemes(shared: true)
+    let existingSchemes = try schemeManager.listSchemes(shared: true)
     if !existingSchemes.contains(schemeName) {
       throw ProjectError.operationFailed("Scheme '\(schemeName)' not found")
     }

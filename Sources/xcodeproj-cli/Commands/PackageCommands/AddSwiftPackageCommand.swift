@@ -28,12 +28,14 @@ struct AddSwiftPackageCommand: Command {
     let versionFlag = arguments.getFlag("--version", "-v")
     let branchFlag = arguments.getFlag("--branch", "-b")
     let commitFlag = arguments.getFlag("--commit", "-c")
-    
+
     let versionFlags = [versionFlag, branchFlag, commitFlag].compactMap { $0 }
     if versionFlags.count > 1 {
-      throw ProjectError.invalidArguments("Cannot specify multiple version requirements (--version, --branch, --commit are mutually exclusive)")
+      throw ProjectError.invalidArguments(
+        "Cannot specify multiple version requirements (--version, --branch, --commit are mutually exclusive)"
+      )
     }
-    
+
     // Get requirement (version, branch, or commit)
     let requirement: String
     if let version = versionFlag {
@@ -43,7 +45,8 @@ struct AddSwiftPackageCommand: Command {
     } else if let commit = commitFlag {
       requirement = "commit:\(commit)"
     } else {
-      throw ProjectError.invalidArguments("add-swift-package requires one of: --version, --branch, or --commit flag")
+      throw ProjectError.invalidArguments(
+        "add-swift-package requires one of: --version, --branch, or --commit flag")
     }
 
     let targetName = arguments.getFlag("--target", "-t")

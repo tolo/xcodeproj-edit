@@ -14,11 +14,30 @@ class BuildConfigurationManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
   private let pbxproj: PBXProj
+  private let transactionManager: TransactionManager
 
   init(xcodeproj: XcodeProj, projectPath: Path) {
     self.xcodeproj = xcodeproj
     self.projectPath = projectPath
     self.pbxproj = xcodeproj.pbxproj
+    self.transactionManager = TransactionManager(projectPath: projectPath)
+  }
+
+  // MARK: - Transaction Support
+
+  /// Begins a transaction for build configuration modifications
+  func beginTransaction() throws {
+    try transactionManager.beginTransaction()
+  }
+
+  /// Commits the current transaction
+  func commitTransaction() throws {
+    try transactionManager.commitTransaction()
+  }
+
+  /// Rolls back the current transaction
+  func rollbackTransaction() throws {
+    try transactionManager.rollbackTransaction()
   }
 
   // MARK: - Configuration File Management
@@ -72,7 +91,7 @@ class BuildConfigurationManager {
       }
 
       guard let configList = target.buildConfigurationList else {
-        throw ProjectError.operationFailed("Target has no build configuration list")
+        throw ProjectError.buildConfigurationListMissing(targetName)
       }
 
       for config in configList.buildConfigurations {
@@ -108,7 +127,7 @@ class BuildConfigurationManager {
       }
 
       guard let configList = target.buildConfigurationList else {
-        throw ProjectError.operationFailed("Target has no build configuration list")
+        throw ProjectError.buildConfigurationListMissing(targetName)
       }
 
       for config in configList.buildConfigurations {
@@ -176,21 +195,21 @@ class BuildConfigurationManager {
       }
 
       guard let configList = target.buildConfigurationList else {
-        throw ProjectError.operationFailed("Target has no build configuration list")
+        throw ProjectError.buildConfigurationListMissing(targetName)
       }
 
       let sourceSettings = configList.buildConfigurations
         .first { $0.name == sourceConfig }?.buildSettings
 
       guard let settings = sourceSettings else {
-        throw ProjectError.operationFailed("Source configuration '\(sourceConfig)' not found")
+        throw ProjectError.configurationNotFound(sourceConfig)
       }
 
       guard
         let destConfigObj = configList.buildConfigurations
           .first(where: { $0.name == destConfig })
       else {
-        throw ProjectError.operationFailed("Destination configuration '\(destConfig)' not found")
+        throw ProjectError.configurationNotFound(destConfig)
       }
 
       destConfigObj.buildSettings = settings
@@ -207,14 +226,14 @@ class BuildConfigurationManager {
         .first { $0.name == sourceConfig }?.buildSettings
 
       guard let settings = sourceSettings else {
-        throw ProjectError.operationFailed("Source configuration '\(sourceConfig)' not found")
+        throw ProjectError.configurationNotFound(sourceConfig)
       }
 
       guard
         let destConfigObj = configList.buildConfigurations
           .first(where: { $0.name == destConfig })
       else {
-        throw ProjectError.operationFailed("Destination configuration '\(destConfig)' not found")
+        throw ProjectError.configurationNotFound(destConfig)
       }
 
       destConfigObj.buildSettings = settings
@@ -288,7 +307,7 @@ class BuildConfigurationManager {
     }
 
     guard let config = list.buildConfigurations.first(where: { $0.name == configName }) else {
-      throw ProjectError.operationFailed("Configuration '\(configName)' not found")
+      throw ProjectError.configurationNotFound(configName)
     }
 
     let content: String

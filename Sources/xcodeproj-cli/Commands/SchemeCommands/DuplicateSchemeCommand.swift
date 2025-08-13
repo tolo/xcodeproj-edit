@@ -31,9 +31,9 @@ struct DuplicateSchemeCommand: Command {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 
     // Check if source scheme exists
-    let existingSchemes = schemeManager.listSchemes(shared: true)
+    let existingSchemes = try schemeManager.listSchemes(shared: true)
     if !existingSchemes.contains(sourceName) {
-      throw ProjectError.operationFailed("Source scheme '\(sourceName)' not found")
+      throw ProjectError.schemeNotFound(sourceName)
     }
 
     // Check if destination scheme already exists

@@ -77,7 +77,7 @@ struct PathUtils {
 
     return normalizedPath
   }
-  
+
   /// Validate a file path and throw appropriate error if invalid
   static func validatePath(_ path: String) throws -> String {
     guard let validPath = sanitizePath(path) else {

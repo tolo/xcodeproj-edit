@@ -44,9 +44,15 @@ class XcodeProjService {
   }
 
   private func findGroupInCache(_ path: String) -> PBXGroup? {
-    return profiler?.measureOperation("findGroup-\(path)") {
-      return cacheManager.getGroup(path) ?? findGroupAtPath(path)
-    } ?? (cacheManager.getGroup(path) ?? findGroupAtPath(path))
+    let getGroupResult = {
+      return self.cacheManager.getGroup(path) ?? (try? self.findGroupAtPath(path)) ?? nil
+    }
+
+    if let profiler = profiler {
+      return profiler.measureOperation("findGroup-\(path)", operation: getGroupResult)
+    } else {
+      return getGroupResult()
+    }
   }
 
   // MARK: - Transaction Support
@@ -85,9 +91,7 @@ class XcodeProjService {
       return
     }
 
-    guard let group = findOrCreateGroup(groupPath) else {
-      throw ProjectError.groupNotFound(groupPath)
-    }
+    let group = try findOrCreateGroup(groupPath)
 
     let fileRef = try group.addFile(at: Path(path), sourceRoot: projectPath.parent())
 
@@ -154,14 +158,14 @@ class XcodeProjService {
 
   // MARK: - Group Operations
 
-  func createGroups(_ groupPaths: [String]) {
+  func createGroups(_ groupPaths: [String]) throws {
     for path in groupPaths {
-      _ = findOrCreateGroup(path)
+      _ = try findOrCreateGroup(path)
       print("📁 Created group: \(path)")
     }
   }
 
-  func findOrCreateGroup(_ path: String) -> PBXGroup? {
+  func findOrCreateGroup(_ path: String) throws -> PBXGroup {
     if let cached = findGroupInCache(path) {
       return cached
     }
@@ -169,16 +173,9 @@ class XcodeProjService {
     let pathComponents = path.split(separator: "/").map(String.init)
 
     // Proper error handling for rootGroup access
-    let rootGroup: PBXGroup
-    do {
-      guard let rg = try pbxproj.rootGroup() else {
-        print("⚠️  Unable to access project root group: project may be corrupted")
-        return nil
-      }
-      rootGroup = rg
-    } catch {
-      print("⚠️  Unable to access project root group: \(error)")
-      return nil
+    guard let rootGroup = try pbxproj.rootGroup() else {
+      throw ProjectError.operationFailed(
+        "Unable to access project root group: project may be corrupted")
     }
     var currentGroup = rootGroup
 
@@ -198,13 +195,11 @@ class XcodeProjService {
     return currentGroup
   }
 
-  func findGroupAtPath(_ path: String) -> PBXGroup? {
-    do {
-      guard let rootGroup = try pbxproj.rootGroup() else { return nil }
-      return XcodeProjectHelpers.findGroupByPath(path, in: pbxproj.groups, rootGroup: rootGroup)
-    } catch {
-      return nil
+  func findGroupAtPath(_ path: String) throws -> PBXGroup? {
+    guard let rootGroup = try pbxproj.rootGroup() else {
+      throw ProjectError.operationFailed("Unable to access project root group")
     }
+    return XcodeProjectHelpers.findGroupByPath(path, in: pbxproj.groups, rootGroup: rootGroup)
   }
 
   // MARK: - Target Operations

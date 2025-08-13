@@ -23,7 +23,7 @@ struct CLIRunner {
       exit(0)
     }
 
-    // Handle help flag 
+    // Handle help flag
     let isHelpRequest = args.isEmpty || args.count > 0 && (args[0] == "--help" || args[0] == "-h")
     if isHelpRequest {
       CLIInterface.printUsage()
@@ -32,27 +32,28 @@ struct CLIRunner {
 
     // Extract command early to check if it's workspace-only
     let command = args.first { !$0.starts(with: "-") } ?? ""
-    
+
     // Commands that don't require a project file
     let workspaceOnlyCommands = [
       "create-workspace",
-      "add-project-to-workspace", 
+      "add-project-to-workspace",
       "remove-project-from-workspace",
-      "list-workspace-projects"
+      "list-workspace-projects",
     ]
 
     // Handle workspace-only commands separately
     if workspaceOnlyCommands.contains(command) {
       let (_, dryRun, verbose, command, parsedArgs) = try parseArgumentsForWorkspaceCommand(args)
-      
+
       // Handle dry run mode message
       if dryRun {
         print("🔍 DRY RUN MODE - No changes will be saved")
       }
 
       // Execute workspace command without project context
-      try CommandRegistry.executeWorkspaceCommand(command: command, arguments: parsedArgs, verbose: verbose)
-      
+      try CommandRegistry.executeWorkspaceCommand(
+        command: command, arguments: parsedArgs, verbose: verbose)
+
       if !dryRun {
         print("✅ Operation completed successfully")
       } else {
@@ -63,7 +64,7 @@ struct CLIRunner {
 
     // Extract flags and parse arguments for regular commands
     let (projectPath, dryRun, verbose, actualCommand, parsedArgs) = try parseArguments(args)
-    
+
     // Validate unknown flags
     try validateFlags(parsedArgs, for: actualCommand)
 
@@ -225,26 +226,26 @@ struct CLIRunner {
         + "Available commands: \(CommandRegistry.availableCommands().joined(separator: ", "))"
     )
   }
-  
+
   /// Validate that all flags used are known for the given command
   private static func validateFlags(_ parsedArgs: ParsedArguments, for command: String) throws {
     // Common flags accepted by all commands
     let globalFlags: Set<String> = [
-      "--help", "-h", "--version", "-v", "--verbose", "-V", 
-      "--dry-run", "--project", "-p"
+      "--help", "-h", "--version", "-v", "--verbose", "-V",
+      "--dry-run", "--project", "-p",
     ]
-    
+
     // Command-specific valid flags
     let commandFlags = getValidFlagsForCommand(command)
     let allValidFlags = globalFlags.union(commandFlags)
-    
+
     // Check for unknown flags
     for flag in parsedArgs.flags.keys {
       if !allValidFlags.contains(flag) {
         throw ProjectError.invalidArguments("Unknown flag: \(flag)")
       }
     }
-    
+
     // Check for unknown boolean flags
     for flag in parsedArgs.boolFlags {
       if !allValidFlags.contains(flag) {
@@ -252,14 +253,14 @@ struct CLIRunner {
       }
     }
   }
-  
+
   /// Get valid flags for a specific command
   private static func getValidFlagsForCommand(_ command: String) -> Set<String> {
     switch command {
     case "add-file":
       return ["--group", "-g", "--targets", "-t", "--create-groups", "--no-groups"]
     case "add-files":
-      return ["--group", "-g", "--targets", "-t", "--create-groups", "--no-groups"] 
+      return ["--group", "-g", "--targets", "-t", "--create-groups", "--no-groups"]
     case "add-folder":
       return ["--group", "-g", "--targets", "-t", "--recursive", "-r", "--create-groups"]
     case "add-sync-folder":
@@ -289,7 +290,7 @@ struct CLIRunner {
     case "get-build-settings":
       return ["--targets", "--configs"]
     case "list-build-settings":
-      return ["--targets", "--configs"]
+      return ["--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a"]
     case "add-build-phase":
       return ["--target", "-t", "--script", "-s"]
     case "list-build-configs":
@@ -303,7 +304,7 @@ struct CLIRunner {
     case "list-swift-packages":
       return []
     case "update-swift-packages":
-      return []
+      return ["--force", "-f"]
     case "validate":
       return ["--fix"]
     case "list-files":

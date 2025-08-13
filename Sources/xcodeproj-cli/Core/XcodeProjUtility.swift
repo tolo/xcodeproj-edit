@@ -260,9 +260,11 @@ class XcodeProjUtility {
   func moveFileToGroup(filePath: String, targetGroup: String) throws {
     // Find the file reference
     let fileName = (filePath as NSString).lastPathComponent
-    guard let fileRef = pbxproj.fileReferences.first(where: { 
-      $0.path == fileName || $0.name == fileName || $0.path == filePath || $0.name == filePath 
-    }) else {
+    guard
+      let fileRef = pbxproj.fileReferences.first(where: {
+        $0.path == fileName || $0.name == fileName || $0.path == filePath || $0.name == filePath
+      })
+    else {
       throw ProjectError.operationFailed("File not found: \(filePath)")
     }
 
@@ -772,9 +774,14 @@ class XcodeProjUtility {
     var frameworksPhase =
       target.buildPhases.first { $0 is PBXFrameworksBuildPhase } as? PBXFrameworksBuildPhase
     if frameworksPhase == nil {
-      frameworksPhase = PBXFrameworksBuildPhase()
-      pbxproj.add(object: frameworksPhase!)
-      target.buildPhases.append(frameworksPhase!)
+      let newFrameworksPhase = PBXFrameworksBuildPhase()
+      frameworksPhase = newFrameworksPhase
+      pbxproj.add(object: newFrameworksPhase)
+      target.buildPhases.append(newFrameworksPhase)
+    }
+
+    guard let finalFrameworksPhase = frameworksPhase else {
+      throw ProjectError.operationFailed("Failed to create or find frameworks build phase")
     }
 
     // Create framework reference
@@ -790,7 +797,7 @@ class XcodeProjUtility {
     // Add to build phase
     let buildFile = PBXBuildFile(file: frameworkRef)
     pbxproj.add(object: buildFile)
-    frameworksPhase?.files?.append(buildFile)
+    finalFrameworksPhase.files?.append(buildFile)
 
     // Handle embedding if needed
     if embed {
@@ -802,14 +809,20 @@ class XcodeProjUtility {
         } as? PBXCopyFilesBuildPhase
 
       if embedPhase == nil {
-        embedPhase = PBXCopyFilesBuildPhase(dstSubfolderSpec: .frameworks, name: "Embed Frameworks")
-        pbxproj.add(object: embedPhase!)
-        target.buildPhases.append(embedPhase!)
+        let newEmbedPhase = PBXCopyFilesBuildPhase(
+          dstSubfolderSpec: .frameworks, name: "Embed Frameworks")
+        embedPhase = newEmbedPhase
+        pbxproj.add(object: newEmbedPhase)
+        target.buildPhases.append(newEmbedPhase)
+      }
+
+      guard let finalEmbedPhase = embedPhase else {
+        throw ProjectError.operationFailed("Failed to create or find embed frameworks build phase")
       }
 
       let embedFile = PBXBuildFile(file: frameworkRef, settings: ["ATTRIBUTES": ["CodeSignOnCopy"]])
       pbxproj.add(object: embedFile)
-      embedPhase?.files?.append(embedFile)
+      finalEmbedPhase.files?.append(embedFile)
     }
 
     print("✅ Added framework: \(name) to \(targetName)\(embed ? " (embedded)" : "")")
@@ -939,16 +952,16 @@ class XcodeProjUtility {
       }
 
       print("  - \(url)")
-      
+
       if let requirement = package.versionRequirement {
         print("    Current: \(requirement)")
-        
+
         // For this initial implementation, we'll provide information about the update process
         // In a real implementation, we would need to:
         // 1. Query the repository for available versions/tags
         // 2. Compare with current constraints
         // 3. Update the versionRequirement if needed
-        
+
         switch requirement {
         case .upToNextMajorVersion(let version):
           if force {
@@ -957,33 +970,36 @@ class XcodeProjUtility {
           } else {
             print("    ✅ Already using flexible version constraint 'from: \(version)'")
           }
-          
+
         case .upToNextMinorVersion(let version):
           if force {
-            print("    ℹ️  Force update requested - would update from 'upToNextMinor: \(version)' to latest")
+            print(
+              "    ℹ️  Force update requested - would update from 'upToNextMinor: \(version)' to latest"
+            )
             updatedCount += 1
           } else {
             print("    ✅ Already using flexible version constraint 'upToNextMinor: \(version)'")
           }
-          
+
         case .exact(let version):
           print("    ℹ️  Would update from exact version '\(version)' to latest compatible")
           if force {
             print("    ⚠️  Force update would remove version pinning")
           }
           updatedCount += 1
-          
+
         case .branch(let branch):
           print("    ℹ️  Using branch '\(branch)' - would pull latest commits")
           updatedCount += 1
-          
+
         case .revision(let revision):
           print("    ℹ️  Using revision '\(revision)' - would update to latest")
           updatedCount += 1
-          
-        case .range(from: let from, to: let to):
+
+        case .range(let from, let to):
           if force {
-            print("    ℹ️  Force update requested - would update from range '\(from)..<\(to)' to latest")
+            print(
+              "    ℹ️  Force update requested - would update from range '\(from)..<\(to)' to latest")
             updatedCount += 1
           } else {
             print("    ✅ Already using range constraint '\(from)..<\(to)'")
@@ -996,12 +1012,16 @@ class XcodeProjUtility {
 
     if updatedCount == 0 {
       print("✅ All packages are already using flexible version constraints")
-      print("ℹ️  Use 'swift package update' in your project directory to fetch latest compatible versions")
+      print(
+        "ℹ️  Use 'swift package update' in your project directory to fetch latest compatible versions"
+      )
     } else {
       print("ℹ️  Found \(updatedCount) package(s) that could benefit from updates")
-      print("ℹ️  Note: Actual package resolution requires running 'swift package update' in your project")
+      print(
+        "ℹ️  Note: Actual package resolution requires running 'swift package update' in your project"
+      )
       print("ℹ️  This command updates the project file constraints, not the resolved versions")
-      
+
       if !force {
         print("ℹ️  Use --force to update exact version constraints to flexible ranges")
       }
@@ -1020,6 +1040,12 @@ class XcodeProjUtility {
     case "run_script", "script":
       guard let script = script else {
         throw ProjectError.operationFailed("Script required for run_script phase")
+      }
+
+      // Validate script for security before adding
+      guard SecurityUtils.validateShellScript(script) else {
+        throw ProjectError.invalidArguments(
+          "Script contains dangerous patterns and cannot be added")
       }
 
       let scriptPhase = PBXShellScriptBuildPhase(

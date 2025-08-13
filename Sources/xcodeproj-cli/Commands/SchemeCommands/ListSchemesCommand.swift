@@ -39,12 +39,12 @@ struct ListSchemesCommand: Command {
     var allSchemes: [(name: String, type: String)] = []
 
     if showShared {
-      let sharedSchemes = schemeManager.listSchemes(shared: true)
+      let sharedSchemes = try schemeManager.listSchemes(shared: true)
       allSchemes.append(contentsOf: sharedSchemes.map { ($0, "shared") })
     }
 
     if showUser {
-      let userSchemes = schemeManager.listSchemes(shared: false)
+      let userSchemes = try schemeManager.listSchemes(shared: false)
       allSchemes.append(contentsOf: userSchemes.map { ($0, "user") })
     }
 

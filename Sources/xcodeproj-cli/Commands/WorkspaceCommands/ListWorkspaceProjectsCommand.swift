@@ -29,7 +29,7 @@ struct ListWorkspaceProjectsCommand: Command {
     let workspaceManager = WorkspaceManager()
 
     // List projects in workspace
-    let projects = workspaceManager.listWorkspaceProjects(workspaceName: workspaceName)
+    let projects = try workspaceManager.listWorkspaceProjects(workspaceName: workspaceName)
 
     if projects.isEmpty {
       print("No projects found in workspace '\(workspaceName)'")
@@ -74,10 +74,10 @@ struct ListWorkspaceProjectsCommand: Command {
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()
-    
+
     // List projects in workspace
-    let projects = workspaceManager.listWorkspaceProjects(workspaceName: cmd.workspaceName)
-    
+    let projects = try workspaceManager.listWorkspaceProjects(workspaceName: cmd.workspaceName)
+
     if projects.isEmpty {
       print("No projects found in workspace '\(cmd.workspaceName)'")
     } else {
@@ -89,7 +89,7 @@ struct ListWorkspaceProjectsCommand: Command {
           print("  \(project)")
         }
       }
-      
+
       if cmd.verbose || verbose {
         print("\nTotal projects: \(projects.count)")
       }

@@ -62,12 +62,13 @@ struct CreateWorkspaceCommand: Command {
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try CreateWorkspaceCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()
-    
+
     // Create the workspace
     let workspace = try workspaceManager.createWorkspace(name: cmd.workspaceName)
-    
+
     if cmd.verbose || verbose {
-      print("  Location: \(FileManager.default.currentDirectoryPath)/\(cmd.workspaceName).xcworkspace")
+      print(
+        "  Location: \(FileManager.default.currentDirectoryPath)/\(cmd.workspaceName).xcworkspace")
       print("  Children count: \(workspace.data.children.count)")
     }
   }

@@ -12,9 +12,40 @@ import XcodeProj
 /// Service for managing Xcode workspaces
 class WorkspaceManager {
   private let workingDirectory: Path
+  private let transactionManager: TransactionManager?
 
-  init(workingDirectory: String = FileManager.default.currentDirectoryPath) {
+  init(
+    workingDirectory: String = FileManager.default.currentDirectoryPath, projectPath: String? = nil
+  ) {
     self.workingDirectory = Path(workingDirectory)
+    self.transactionManager =
+      projectPath != nil ? TransactionManager(projectPath: Path(projectPath!)) : nil
+  }
+
+  // MARK: - Transaction Support
+
+  /// Begins a transaction for workspace modifications
+  func beginTransaction() throws {
+    guard let transactionManager = transactionManager else {
+      return  // No transaction manager available for workspace-only operations
+    }
+    try transactionManager.beginTransaction()
+  }
+
+  /// Commits the current transaction
+  func commitTransaction() throws {
+    guard let transactionManager = transactionManager else {
+      return  // No transaction manager available for workspace-only operations
+    }
+    try transactionManager.commitTransaction()
+  }
+
+  /// Rolls back the current transaction
+  func rollbackTransaction() throws {
+    guard let transactionManager = transactionManager else {
+      return  // No transaction manager available for workspace-only operations
+    }
+    try transactionManager.rollbackTransaction()
   }
 
   // MARK: - Workspace Creation
@@ -48,6 +79,9 @@ class WorkspaceManager {
     workspaceName: String,
     projectPath: String
   ) throws {
+    // Validate project path for security
+    let resolvedProjectPath = try PathUtils.validatePath(projectPath)
+
     let workspacePath = findWorkspace(name: workspaceName)
 
     guard workspacePath.exists else {
@@ -56,9 +90,6 @@ class WorkspaceManager {
 
     // Load existing workspace
     let workspace = try XCWorkspace(path: workspacePath)
-
-    // Use project path as-is for now (simplified approach)
-    let resolvedProjectPath = projectPath
 
     // Check if project already exists in workspace
     for child in workspace.data.children {
@@ -85,6 +116,9 @@ class WorkspaceManager {
     workspaceName: String,
     projectPath: String
   ) throws {
+    // Validate project path for security
+    let validatedProjectPath = try PathUtils.validatePath(projectPath)
+
     let workspacePath = findWorkspace(name: workspaceName)
 
     guard workspacePath.exists else {
@@ -99,8 +133,20 @@ class WorkspaceManager {
     workspace.data.children.removeAll { child in
       if case let .file(ref) = child {
         if case let .group(path) = ref.location {
-          // Check if paths match (handle various path formats)
-          if path == projectPath || path.hasSuffix(projectPath) || projectPath.hasSuffix(path) {
+          // Use proper path comparison instead of fragile string matching
+          let normalizedRefPath = (path as NSString).standardizingPath
+          let normalizedProjectPath = (validatedProjectPath as NSString).standardizingPath
+
+          // Check for exact match or if paths resolve to the same location
+          if normalizedRefPath == normalizedProjectPath {
+            found = true
+            return true
+          }
+
+          // Also check if the last path component matches (for relative vs absolute paths)
+          let refLastComponent = (normalizedRefPath as NSString).lastPathComponent
+          let projectLastComponent = (normalizedProjectPath as NSString).lastPathComponent
+          if refLastComponent == projectLastComponent && refLastComponent.hasSuffix(".xcodeproj") {
             found = true
             return true
           }
@@ -120,12 +166,11 @@ class WorkspaceManager {
   }
 
   /// Lists all projects in a workspace
-  func listWorkspaceProjects(workspaceName: String) -> [String] {
+  func listWorkspaceProjects(workspaceName: String) throws -> [String] {
     let workspacePath = findWorkspace(name: workspaceName)
 
     guard workspacePath.exists else {
-      print("⚠️  Workspace '\(workspaceName)' not found")
-      return []
+      throw ProjectError.workspaceNotFound(workspaceName)
     }
 
     do {
@@ -150,8 +195,7 @@ class WorkspaceManager {
 
       return projects
     } catch {
-      print("⚠️  Failed to load workspace: \(error)")
-      return []
+      throw ProjectError.workspaceLoadFailed(workspaceName, error)
     }
   }
 
@@ -173,7 +217,10 @@ class WorkspaceManager {
       }
       group = existingGroup
     } else {
-      group = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first!
+      guard let mainGroup = pbxproj.rootObject?.mainGroup ?? pbxproj.groups.first else {
+        throw ProjectError.operationFailed("No main group or root groups found in project")
+      }
+      group = mainGroup
     }
 
     // Create file reference for the external project

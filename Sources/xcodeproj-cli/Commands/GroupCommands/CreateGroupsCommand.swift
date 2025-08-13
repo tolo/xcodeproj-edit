@@ -21,7 +21,7 @@ struct CreateGroupsCommand: Command {
     }
 
     // Create all specified groups
-    utility.createGroups(arguments.positional)
+    try utility.createGroups(arguments.positional)
 
     // Save changes
     try utility.save()

@@ -25,7 +25,8 @@ struct CreateSchemeCommand: Command {
 
     self.schemeName = name
     self.targetName = arguments.getFlag("--target", "target") ?? name  // Default to scheme name if no target specified
-    self.shared = arguments.boolFlags.contains("--shared") || !arguments.boolFlags.contains("--user")
+    self.shared =
+      arguments.boolFlags.contains("--shared") || !arguments.boolFlags.contains("--user")
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
@@ -33,7 +34,7 @@ struct CreateSchemeCommand: Command {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 
     // Check if scheme already exists
-    let existingSchemes = schemeManager.listSchemes(shared: shared)
+    let existingSchemes = try schemeManager.listSchemes(shared: shared)
     if existingSchemes.contains(schemeName) {
       throw ProjectError.operationFailed("Scheme '\(schemeName)' already exists")
     }

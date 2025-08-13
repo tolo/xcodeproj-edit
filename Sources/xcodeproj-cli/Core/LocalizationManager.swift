@@ -14,11 +14,30 @@ class LocalizationManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
   private let pbxproj: PBXProj
+  private let transactionManager: TransactionManager
 
   init(xcodeproj: XcodeProj, projectPath: Path) {
     self.xcodeproj = xcodeproj
     self.projectPath = projectPath
     self.pbxproj = xcodeproj.pbxproj
+    self.transactionManager = TransactionManager(projectPath: projectPath)
+  }
+
+  // MARK: - Transaction Support
+
+  /// Begins a transaction for localization modifications
+  func beginTransaction() throws {
+    try transactionManager.beginTransaction()
+  }
+
+  /// Commits the current transaction
+  func commitTransaction() throws {
+    try transactionManager.commitTransaction()
+  }
+
+  /// Rolls back the current transaction
+  func rollbackTransaction() throws {
+    try transactionManager.rollbackTransaction()
   }
 
   // MARK: - Localization Management
@@ -32,8 +51,7 @@ class LocalizationManager {
 
     // Check if localization already exists
     if pbxproj.rootObject?.knownRegions.contains(languageCode) == true {
-      print("⚠️  Localization '\(languageCode)' already exists")
-      return
+      throw ProjectError.localizationAlreadyExists(languageCode)
     }
 
     // Add the localization
@@ -54,7 +72,7 @@ class LocalizationManager {
     }
 
     guard knownRegions.contains(languageCode) else {
-      throw ProjectError.operationFailed("Localization '\(languageCode)' not found")
+      throw ProjectError.localizationNotFound(languageCode)
     }
 
     // Remove from known regions

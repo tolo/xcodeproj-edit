@@ -68,13 +68,13 @@ struct RemoveProjectFromWorkspaceCommand: Command {
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try RemoveProjectFromWorkspaceCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()
-    
+
     // Remove project from workspace
     try workspaceManager.removeProjectFromWorkspace(
       workspaceName: cmd.workspaceName,
       projectPath: cmd.projectPath
     )
-    
+
     if cmd.verbose || verbose {
       print("  Workspace: \(cmd.workspaceName).xcworkspace")
       print("  Removed project: \(cmd.projectPath)")

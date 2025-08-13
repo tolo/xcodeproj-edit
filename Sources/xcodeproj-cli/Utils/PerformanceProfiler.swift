@@ -139,14 +139,20 @@ class PerformanceProfiler {
     var count = mach_msg_type_number_t(
       MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
 
-    // Ensure count is valid before proceeding
-    guard count > 0 else { return 0 }
+    // Ensure count is valid and within safe bounds before proceeding
+    guard count > 0 && count <= 1024 else { return 0 }  // Reasonable upper bound for safety
+
+    // Store original count for validation
+    let originalCount = count
 
     let result = withUnsafeMutablePointer(to: &info) {
       $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
         task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
       }
     }
+
+    // Verify count wasn't modified unexpectedly
+    guard count <= originalCount else { return 0 }
 
     if result == KERN_SUCCESS {
       return info.resident_size

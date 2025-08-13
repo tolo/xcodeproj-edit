@@ -68,13 +68,13 @@ struct AddProjectToWorkspaceCommand: Command {
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try AddProjectToWorkspaceCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()
-    
+
     // Add project to workspace
     try workspaceManager.addProjectToWorkspace(
       workspaceName: cmd.workspaceName,
       projectPath: cmd.projectPath
     )
-    
+
     if cmd.verbose || verbose {
       print("  Workspace: \(cmd.workspaceName).xcworkspace")
       print("  Added project: \(cmd.projectPath)")

@@ -32,7 +32,8 @@ class BaseCommand {
   {
     guard arguments.positional.count >= count else {
       let missingCount = count - arguments.positional.count
-      let errorMessage = missingCount == 1 
+      let errorMessage =
+        missingCount == 1
         ? "Missing required argument. \(usage)"
         : "Missing \(missingCount) required arguments. \(usage)"
       throw ProjectError.invalidArguments(errorMessage)
@@ -72,7 +73,7 @@ class BaseCommand {
       "com.apple.product-type.framework",
       "static-library",
       "com.apple.product-type.library.static",
-      "dynamic-library", 
+      "dynamic-library",
       "com.apple.product-type.library.dynamic",
       "test",
       "com.apple.product-type.bundle.unit-test",
@@ -81,11 +82,13 @@ class BaseCommand {
       "bundle",
       "com.apple.product-type.bundle",
       "tool",
-      "com.apple.product-type.tool"
+      "com.apple.product-type.tool",
     ]
-    
+
     guard validProductTypes.contains(productType) else {
-      throw ProjectError.invalidArguments("Invalid product type '\(productType)'. Valid types: \(validProductTypes.joined(separator: ", "))")
+      throw ProjectError.invalidArguments(
+        "Invalid product type '\(productType)'. Valid types: \(validProductTypes.joined(separator: ", "))"
+      )
     }
   }
 }

@@ -236,14 +236,17 @@ struct CommandRegistry {
   }
 
   /// Execute a workspace command that doesn't require a project context
-  static func executeWorkspaceCommand(command: String, arguments: ParsedArguments, verbose: Bool) throws {
+  static func executeWorkspaceCommand(command: String, arguments: ParsedArguments, verbose: Bool)
+    throws
+  {
     switch command {
     case "create-workspace":
       try CreateWorkspaceCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
     case "add-project-to-workspace":
       try AddProjectToWorkspaceCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
     case "remove-project-from-workspace":
-      try RemoveProjectFromWorkspaceCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
+      try RemoveProjectFromWorkspaceCommand.executeAsWorkspaceCommand(
+        with: arguments, verbose: verbose)
     case "list-workspace-projects":
       try ListWorkspaceProjectsCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
     default:

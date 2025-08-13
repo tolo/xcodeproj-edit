@@ -17,14 +17,15 @@ struct GetBuildSettingsCommand: Command {
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let targetName: String
     let configuration = arguments.getFlag("--config", "-c") ?? arguments.getFlag("--configuration")
-    
+
     // Check if target is provided as --targets flag or positional argument
     if let targetsFlag = arguments.getFlag("--targets") {
       targetName = targetsFlag
     } else if arguments.positional.count >= 1 {
       targetName = arguments.positional[0]
     } else {
-      throw ProjectError.invalidArguments("get-build-settings requires: <target> [--config <configuration>]")
+      throw ProjectError.invalidArguments(
+        "get-build-settings requires: <target> [--config <configuration>]")
     }
 
     // Validate target exists
