@@ -7,9 +7,39 @@ import Foundation
 import PathKit
 import XcodeProj  // @tuist ~> 8.12.0
 
+// Load TestHelper for binary discovery
+#if canImport(TestHelper)
+import TestHelper
+#else
+// Inline helper when import not available
+struct TestHelper {
+  static func getToolPath() -> String { "../.build/release/xcodeproj-cli" }
+  static func runTool(_ arguments: [String], projectPath: String = "TestData/TestProject.xcodeproj") -> String {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.environment = ProcessInfo.processInfo.environment
+    process.arguments = [getToolPath(), "--project", projectPath] + arguments
+    process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+    do {
+      try process.run()
+      process.waitUntilExit()
+      
+      let data = pipe.fileHandleForReading.readDataToEndOfFile()
+      return String(data: data, encoding: .utf8) ?? ""
+    } catch {
+      return "Error running tool: \(error)"
+    }
+  }
+}
+#endif
+
 @main
 struct TestSuite {
-  static let toolPath = "../src/xcodeproj-cli.swift"
   static let testProjectPath = "TestData/TestProject.xcodeproj"
   static let testProjectBackupPath = "TestData/TestProject.xcodeproj.backup"
 
@@ -27,6 +57,10 @@ struct TestSuite {
     setbuf(stdout, nil)
     print("🧪 XcodeProj Edit Swift Test Suite")
     print("===================================\n")
+
+    // Ensure binary exists and is working
+    let toolPath = TestHelper.getToolPath()
+    print("📍 Using binary: \(toolPath)")
 
     // Ensure test project exists
     if !FileManager.default.fileExists(atPath: testProjectPath) {
@@ -60,29 +94,29 @@ struct TestSuite {
     print("--------------------------")
 
     test("List targets") {
-      let output = runTool(["list-targets"])
+      let output = TestHelper.runTool(["list-targets"])
       return output.contains("TestApp")
     }
 
     test("List groups") {
-      let output = runTool(["list-groups"])
+      let output = TestHelper.runTool(["list-groups"])
       return output.contains("Sources") && output.contains("Resources")
     }
 
     test("List files") {
-      let output = runTool(["list-files"])
+      let output = TestHelper.runTool(["list-files"])
       return output.contains("file") || output.contains("No files") || output.contains("📄")
     }
 
     test("List tree structure") {
-      let output = runTool(["list-tree"])
+      let output = TestHelper.runTool(["list-tree"])
       // Check for tree structure elements
       return output.contains("├──") || output.contains("└──")
         || (output.contains("Sources") && output.contains("("))
     }
 
     test("List build configurations") {
-      let output = runTool(["list-build-configs"])
+      let output = TestHelper.runTool(["list-build-configs"])
       return output.contains("Debug") && output.contains("Release")
     }
 
@@ -100,14 +134,14 @@ struct TestSuite {
       toFile: "TestData/Sources/Helper.swift", atomically: true, encoding: .utf8)
 
     test("Add file to project") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "TestFile.swift", "--group", "Sources", "--targets", "TestApp",
       ])
       return output.contains("Added TestFile.swift") || output.contains("already exists")
     }
 
     test("Add multiple files") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-files",
         "TestFile.swift:Sources",
         "Helper.swift:Sources",
@@ -117,12 +151,12 @@ struct TestSuite {
     }
 
     test("Move file") {
-      let output = runTool(["move-file", "TestFile.swift", "TestFileRenamed.swift"])
+      let output = TestHelper.runTool(["move-file", "TestFile.swift", "TestFileRenamed.swift"])
       return output.contains("Moved") || !output.contains("Error")
     }
 
     test("Remove file") {
-      let output = runTool(["remove-file", "Helper.swift"])
+      let output = TestHelper.runTool(["remove-file", "Helper.swift"])
       return output.contains("Removed") || !output.contains("not found")
     }
 
@@ -134,7 +168,7 @@ struct TestSuite {
     print("---------------------------------------")
 
     test("Add Models folder recursively") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-folder",
         "TestData/Sources/Models",
         "--group", "Models",
@@ -147,7 +181,7 @@ struct TestSuite {
     }
 
     test("Add Views folder with SwiftUI files") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-folder",
         "TestData/Sources/Views",
         "--group", "Views",
@@ -161,7 +195,7 @@ struct TestSuite {
     }
 
     test("Add ViewModels folder") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-folder",
         "TestData/Sources/ViewModels",
         "--group", "ViewModels",
@@ -174,14 +208,14 @@ struct TestSuite {
     }
 
     test("Verify file filtering works") {
-      let output = runTool(["list-files", "Models"])
+      let output = TestHelper.runTool(["list-files", "Models"])
       // Should NOT contain .DS_Store
       return !output.contains(".DS_Store")
         && (output.contains("Item.swift") || output.contains("📄") || output.contains("No files"))
     }
 
     test("Add synchronized folder reference") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-sync-folder",
         "TestData/Resources",
         "--group", "Resources",
@@ -192,7 +226,7 @@ struct TestSuite {
     }
 
     test("Add entire Sources directory") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-folder",
         "TestData/Sources",
         "--group", "Sources",
@@ -205,7 +239,7 @@ struct TestSuite {
     }
 
     test("List files in Views group") {
-      let output = runTool(["list-files", "Views"])
+      let output = TestHelper.runTool(["list-files", "Views"])
       // Should show SwiftUI view files
       return output.contains("ContentView.swift") || output.contains("ItemView.swift")
         || output.contains("📄") || output.contains("No files")
@@ -219,7 +253,7 @@ struct TestSuite {
     print("---------------------------")
 
     test("Create groups") {
-      let output = runTool(["add-group", "Features/Login", "Features/Profile"])
+      let output = TestHelper.runTool(["add-group", "Features/Login", "Features/Profile"])
       return output.contains("Created group") || output.contains("📁")
     }
 
@@ -232,7 +266,7 @@ struct TestSuite {
         toFile: "TestData/Features/Feature.swift",
         atomically: true, encoding: .utf8)
 
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-folder", "TestData/Features", "--group", "Features", "--targets", "TestApp",
       ])
       return output.contains("Added folder") || !output.contains("Error")
@@ -246,7 +280,7 @@ struct TestSuite {
     print("----------------------------")
 
     test("Add new target") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-target", "TestFramework",
         "--type", "com.apple.product-type.framework",
         "--bundle-id", "com.test.framework",
@@ -256,18 +290,18 @@ struct TestSuite {
 
     test("Add dependency") {
       // First ensure both targets exist
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-target", "TestFramework",
         "--type", "com.apple.product-type.framework",
         "--bundle-id", "com.test.framework",
       ])
 
-      let output = runTool(["add-dependency", "TestApp", "--depends-on", "TestFramework"])
+      let output = TestHelper.runTool(["add-dependency", "TestApp", "--depends-on", "TestFramework"])
       return output.contains("Added dependency") || output.contains("already exists")
     }
 
     test("Duplicate target") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "duplicate-target", "TestApp", "TestAppPro",
         "--bundle-id", "com.test.pro",
       ])
@@ -282,7 +316,7 @@ struct TestSuite {
     print("-------------------------")
 
     test("Set build setting") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "set-build-setting", "SWIFT_VERSION", "5.9",
         "--targets", "TestApp",
       ])
@@ -290,7 +324,7 @@ struct TestSuite {
     }
 
     test("Get build settings") {
-      let output = runTool(["get-build-settings", "TestApp", "--config", "Debug"])
+      let output = TestHelper.runTool(["get-build-settings", "TestApp", "--config", "Debug"])
       return output.contains("SWIFT_VERSION") || output.contains("PRODUCT_NAME")
     }
 
@@ -302,14 +336,14 @@ struct TestSuite {
     print("---------------------")
 
     test("Validate project") {
-      let output = runTool(["validate"])
+      let output = TestHelper.runTool(["validate"])
       // Validation might find issues or not, both are valid
       return output.contains("validation") || output.contains("No validation issues")
         || output.contains("Validation issues") || output.contains("✅") || output.contains("❌")
     }
 
     test("List invalid references") {
-      let output = runTool(["list-invalid-references"])
+      let output = TestHelper.runTool(["list-invalid-references"])
       // The command should run and produce output about checking references
       return output.contains("Checking for invalid file")
         && (output.contains("All file references are valid")
@@ -318,28 +352,28 @@ struct TestSuite {
 
     test("List invalid references - with invalid files") {
       // Add a non-existent file
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-file", "NonExistentTestFile.swift", "--group", "Sources", "--targets", "TestApp",
       ])
 
       // Check for invalid references
-      let output = runTool(["list-invalid-references"])
+      let output = TestHelper.runTool(["list-invalid-references"])
       let hasInvalid =
         output.contains("invalid file reference") && output.contains("NonExistentTestFile.swift")
 
       // Clean up
-      _ = runTool(["remove-file", "NonExistentTestFile.swift"])
+      _ = TestHelper.runTool(["remove-file", "NonExistentTestFile.swift"])
 
       return hasInvalid
     }
 
     test("List invalid references - with invalid folders") {
       // Create groups pointing to non-existent folders
-      _ = runTool(["add-group", "InvalidFolder1"])
-      _ = runTool(["add-group", "InvalidFolder2/SubFolder"])
+      _ = TestHelper.runTool(["add-group", "InvalidFolder1"])
+      _ = TestHelper.runTool(["add-group", "InvalidFolder2/SubFolder"])
 
       // Check for invalid references
-      let output = runTool(["list-invalid-references"])
+      let output = TestHelper.runTool(["list-invalid-references"])
       let hasInvalidFolders =
         output.contains("Folder not found")
         && (output.contains("InvalidFolder1") || output.contains("InvalidFolder2"))
@@ -349,21 +383,21 @@ struct TestSuite {
 
     test("Remove invalid references - folders") {
       // Create groups pointing to non-existent folders
-      _ = runTool(["add-group", "TestInvalidDir"])
-      _ = runTool(["add-group", "TestInvalidDir2/SubDir"])
+      _ = TestHelper.runTool(["add-group", "TestInvalidDir"])
+      _ = TestHelper.runTool(["add-group", "TestInvalidDir2/SubDir"])
 
       // Verify they exist as invalid
-      let checkBefore = runTool(["list-invalid-references"])
+      let checkBefore = TestHelper.runTool(["list-invalid-references"])
       let hasInvalidBefore =
         checkBefore.contains("Folder not found") && checkBefore.contains("TestInvalidDir")
 
       // Remove invalid references
-      let removeOutput = runTool(["remove-invalid-references"])
+      let removeOutput = TestHelper.runTool(["remove-invalid-references"])
       let removed =
         removeOutput.contains("Will remove folder") && removeOutput.contains("TestInvalidDir")
 
       // Verify they're gone
-      let checkAfter = runTool(["list-invalid-references"])
+      let checkAfter = TestHelper.runTool(["list-invalid-references"])
       let allValidAfter =
         checkAfter.contains("All file references are valid")
         || !checkAfter.contains("TestInvalidDir")
@@ -373,18 +407,18 @@ struct TestSuite {
 
     test("Remove invalid references - mixed files and folders") {
       // Add invalid files
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-file", "TestInvalidFile.txt", "--group", "Resources", "--targets", "TestApp",
       ])
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-file", "TestInvalidCode.swift", "--group", "Sources", "--targets", "TestApp",
       ])
 
       // Add invalid folders
-      _ = runTool(["add-group", "MixedInvalidFolder"])
+      _ = TestHelper.runTool(["add-group", "MixedInvalidFolder"])
 
       // Remove all invalid references
-      let removeOutput = runTool(["remove-invalid-references"])
+      let removeOutput = TestHelper.runTool(["remove-invalid-references"])
       let removedFiles =
         removeOutput.contains("Will remove")
         && (removeOutput.contains("TestInvalidFile.txt")
@@ -393,7 +427,7 @@ struct TestSuite {
         removeOutput.contains("Will remove folder") && removeOutput.contains("MixedInvalidFolder")
 
       // Verify they're gone
-      let checkOutput = runTool(["list-invalid-references"])
+      let checkOutput = TestHelper.runTool(["list-invalid-references"])
       let allValid = checkOutput.contains("All file references are valid")
 
       return (removedFiles || removedFolders) && allValid
@@ -401,20 +435,20 @@ struct TestSuite {
 
     test("Remove invalid references") {
       // Add non-existent files
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-file", "TestInvalidFile.txt", "--group", "Resources", "--targets", "TestApp",
       ])
-      _ = runTool([
+      _ = TestHelper.runTool([
         "add-file", "TestInvalidCode.swift", "--group", "Sources", "--targets", "TestApp",
       ])
 
       // Remove invalid references
-      let removeOutput = runTool(["remove-invalid-references"])
+      let removeOutput = TestHelper.runTool(["remove-invalid-references"])
       let removed =
         removeOutput.contains("Removed") && removeOutput.contains("invalid file reference")
 
       // Verify they're gone
-      let checkOutput = runTool(["list-invalid-references"])
+      let checkOutput = TestHelper.runTool(["list-invalid-references"])
       let allValid =
         checkOutput.contains("All file references are valid")
         || !checkOutput.contains("TestInvalidFile.txt")
@@ -447,28 +481,6 @@ struct TestSuite {
     }
   }
 
-  static func runTool(_ arguments: [String]) -> String {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.environment = ProcessInfo.processInfo.environment
-    // Add --project flag to specify test project
-    process.arguments = [toolPath, "--project", testProjectPath] + arguments
-    process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = pipe
-
-    do {
-      try process.run()
-      process.waitUntilExit()
-
-      let data = pipe.fileHandleForReading.readDataToEndOfFile()
-      return String(data: data, encoding: .utf8) ?? ""
-    } catch {
-      return "Error running tool: \(error)"
-    }
-  }
 
   static func backupProject() {
     do {

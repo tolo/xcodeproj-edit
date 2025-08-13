@@ -5,9 +5,39 @@
 
 import Foundation
 
+// Load TestHelper for binary discovery
+#if canImport(TestHelper)
+import TestHelper
+#else
+// Inline helper when import not available
+struct TestHelper {
+  static func getToolPath() -> String { "../.build/release/xcodeproj-cli" }
+  static func runTool(_ arguments: [String], projectPath: String = "TestData/TestProject.xcodeproj") -> String {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.environment = ProcessInfo.processInfo.environment
+    process.arguments = [getToolPath(), "--project", projectPath] + arguments
+    process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+    do {
+      try process.run()
+      process.waitUntilExit()
+      
+      let data = pipe.fileHandleForReading.readDataToEndOfFile()
+      return String(data: data, encoding: .utf8) ?? ""
+    } catch {
+      return "Error running tool: \(error)"
+    }
+  }
+}
+#endif
+
 @main
 struct SecurityTests {
-  static let toolPath = "../src/xcodeproj-cli.swift"
   static let testProjectPath = "TestData/TestProject.xcodeproj"
 
   // ANSI color codes
@@ -25,6 +55,10 @@ struct SecurityTests {
     print("🔒 Security & Validation Tests")
     print("==============================\n")
 
+    // Ensure binary exists and is working
+    let toolPath = TestHelper.getToolPath()
+    print("📍 Using binary: \(toolPath)")
+
     testPathTraversalProtection()
     testCommandInjectionProtection()
     testVersionValidation()
@@ -41,12 +75,12 @@ struct SecurityTests {
     print("-----------------------------")
 
     test("Reject multiple ../ traversals") {
-      let output = runTool(["move-file", "test.swift", "../../../etc/passwd"])
+      let output = TestHelper.runTool(["move-file", "test.swift", "../../../etc/passwd"])
       return output.contains("Error") || output.contains("Invalid")
     }
 
     test("Allow single ../ for parent directory") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "../SharedCode/Helper.swift", "--group", "Sources", "--targets", "TestApp",
         "--dry-run",
       ])
@@ -54,14 +88,14 @@ struct SecurityTests {
     }
 
     test("Reject critical system paths") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "/etc/passwd", "--group", "Sources", "--targets", "TestApp",
       ])
       return output.contains("Error") || output.contains("Invalid")
     }
 
     test("Allow user paths") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "/Users/test/file.swift", "--group", "Sources", "--targets", "TestApp",
         "--dry-run",
       ])
@@ -69,7 +103,7 @@ struct SecurityTests {
     }
 
     test("Allow home directory expansion") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "~/Documents/file.swift", "--group", "Sources", "--targets", "TestApp",
         "--dry-run",
       ])
@@ -85,7 +119,7 @@ struct SecurityTests {
 
     test("Escape shell metacharacters in scripts") {
       let dangerousScript = "echo 'test'; rm -rf /"
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-build-phase", "run_script", "--name", "Test", "--target", "TestApp",
         "--script", dangerousScript, "--dry-run",
       ])
@@ -95,7 +129,7 @@ struct SecurityTests {
 
     test("Escape backticks in scripts") {
       let script = "echo `whoami`"
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-build-phase", "run_script", "--name", "Test", "--target", "TestApp",
         "--script", script, "--dry-run",
       ])
@@ -110,7 +144,7 @@ struct SecurityTests {
     print("-----------------------------")
 
     test("Reject invalid semver format") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-swift-package",
         "https://github.com/test/test",
         "--requirement", "not-a-version",
@@ -119,7 +153,7 @@ struct SecurityTests {
     }
 
     test("Accept valid semver") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-swift-package",
         "https://github.com/test/test",
         "--requirement", "1.2.3", "--dry-run",
@@ -128,7 +162,7 @@ struct SecurityTests {
     }
 
     test("Reject invalid package URL") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-swift-package",
         "not-a-url",
         "--requirement", "1.0.0",
@@ -137,7 +171,7 @@ struct SecurityTests {
     }
 
     test("Reject empty branch name") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-swift-package",
         "https://github.com/test/test",
         "--requirement", "branch:",
@@ -153,14 +187,14 @@ struct SecurityTests {
     print("---------------")
 
     test("Dry run prevents saving") {
-      let output = runTool([
+      let output = TestHelper.runTool([
         "--dry-run", "add-file", "test.swift", "--group", "Sources", "--targets", "TestApp",
       ])
       return output.contains("DRY RUN") || output.contains("not saved")
     }
 
     test("Dry run shows intended changes") {
-      let output = runTool(["--dry-run", "add-group", "TestGroup/SubGroup"])
+      let output = TestHelper.runTool(["--dry-run", "add-group", "TestGroup/SubGroup"])
       return output.contains("Created group") || output.contains("DRY RUN")
     }
 
@@ -173,7 +207,7 @@ struct SecurityTests {
 
     test("Backup created on save") {
       // The atomic save should create and remove a temporary backup
-      let output = runTool([
+      let output = TestHelper.runTool([
         "add-file", "transaction_test.swift", "--group", "Sources", "--targets", "TestApp",
       ])
       return output.contains("saved successfully") || output.contains("✅")
@@ -204,27 +238,6 @@ struct SecurityTests {
     }
   }
 
-  static func runTool(_ arguments: [String]) -> String {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.environment = ProcessInfo.processInfo.environment
-    process.arguments = [toolPath, "--project", testProjectPath] + arguments
-    process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = pipe
-
-    do {
-      try process.run()
-      process.waitUntilExit()
-
-      let data = pipe.fileHandleForReading.readDataToEndOfFile()
-      return String(data: data, encoding: .utf8) ?? ""
-    } catch {
-      return "Error running tool: \(error)"
-    }
-  }
 
   static func printSummary() {
     let total = passedTests + failedTests

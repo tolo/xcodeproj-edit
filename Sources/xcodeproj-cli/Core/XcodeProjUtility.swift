@@ -1,257 +1,24 @@
-#!/usr/bin/swift sh
-
-// XcodeProj CLI - Comprehensive Xcode Project Manipulation Utility
-// Version: 1.1.0
-// License: MIT
 //
-// A powerful command-line tool for programmatically manipulating Xcode project files
-// without requiring Xcode or Docker. Provides complete project management capabilities
-// including files, targets, dependencies, build settings, and Swift packages.
+// XcodeProjUtility.swift
+// xcodeproj-cli
 //
-// Usage: ./xcodeproj-cli.swift <command> [options]
-// Run with --help for full command reference
+// Legacy utility class for Xcode project manipulation
+// TODO: Gradually migrate functionality to XcodeProjService
+//
 
 import Foundation
 import PathKit
-import XcodeProj  // @tuist ~> 9.4.3
-
-// MARK: - String Extensions
-extension String {
-  func matches(_ pattern: String) -> Bool {
-    return range(of: pattern, options: .regularExpression) != nil
-  }
-}
-
-// MARK: - Error Types
-enum ProjectError: Error, CustomStringConvertible {
-  case fileAlreadyExists(String)
-  case groupNotFound(String)
-  case targetNotFound(String)
-  case invalidArguments(String)
-  case operationFailed(String)
-
-  var description: String {
-    switch self {
-    case .fileAlreadyExists(let path): return "File already exists: \(path)"
-    case .groupNotFound(let name): return "Group not found: \(name)"
-    case .targetNotFound(let name): return "Target not found: \(name)"
-    case .invalidArguments(let msg): return "Invalid arguments: \(msg)"
-    case .operationFailed(let msg): return "Operation failed: \(msg)"
-    }
-  }
-}
-
-// MARK: - Security Helpers
-func sanitizePath(_ path: String) -> String? {
-  // Block obvious path traversal attempts that try to escape project boundaries
-  if path.contains("../..") || path.contains("..\\..") {
-    // Allow single ../ for referencing parent directories within project
-    // but block multiple levels that could escape project root
-    return nil
-  }
-
-  // For absolute paths, only block critical system directories
-  // This allows adding files from user directories while protecting system
-  if path.hasPrefix("/") {
-    let criticalPaths = ["/etc/passwd", "/etc/shadow", "/private/etc", "/System/Library"]
-    for critical in criticalPaths {
-      if path.hasPrefix(critical) {
-        return nil
-      }
-    }
-  }
-
-  // Allow ~ expansion as coding agents may use it
-  // The shell will handle the actual expansion
-
-  return path
-}
-
-func escapeShellCommand(_ command: String) -> String {
-  // Escape common shell metacharacters
-  let charactersToEscape = ["$", "`", "\\", "\"", "\n"]
-  var escaped = command
-  for char in charactersToEscape {
-    escaped = escaped.replacingOccurrences(of: char, with: "\\\(char)")
-  }
-  return escaped
-}
-
-// MARK: - Helper Functions
-func findGroup(named name: String, in groups: [PBXGroup]) -> PBXGroup? {
-  for group in groups {
-    if group.path == name || group.name == name {
-      return group
-    }
-    let childGroups = group.children.compactMap { $0 as? PBXGroup }
-    if let found = findGroup(named: name, in: childGroups) {
-      return found
-    }
-  }
-  return nil
-}
-
-func fileExists(path: String, in pbxproj: PBXProj) -> Bool {
-  return pbxproj.fileReferences.contains { $0.path == path || $0.name == path }
-}
-
-func sourceBuildPhase(for target: PBXNativeTarget) -> PBXSourcesBuildPhase? {
-  return target.buildPhases.first(where: { $0 is PBXSourcesBuildPhase }) as? PBXSourcesBuildPhase
-}
-
-func fileType(for path: String) -> String {
-  switch (path as NSString).pathExtension.lowercased() {
-  case "swift": return "sourcecode.swift"
-  case "m": return "sourcecode.c.objc"
-  case "mm": return "sourcecode.cpp.objcpp"
-  case "cpp", "cc", "cxx": return "sourcecode.cpp.cpp"
-  case "c": return "sourcecode.c.c"
-  case "h": return "sourcecode.c.h"
-  case "hpp", "hxx": return "sourcecode.cpp.h"
-  case "storyboard": return "file.storyboard"
-  case "xib": return "file.xib"
-  case "plist": return "text.plist.xml"
-  case "json": return "text.json"
-  case "strings": return "text.plist.strings"
-  case "xcassets": return "folder.assetcatalog"
-  case "framework": return "wrapper.framework"
-  case "dylib": return "compiled.mach-o.dylib"
-  case "a": return "archive.ar"
-  case "png", "jpg", "jpeg", "gif", "tiff", "bmp": return "image"
-  case "mp3", "wav", "m4a", "aiff": return "audio"
-  case "mp4", "mov", "avi": return "video"
-  default: return "text"
-  }
-}
-
-// MARK: - Argument Parsing Helpers
-struct ParsedArguments {
-  var positional: [String] = []
-  var flags: [String: String] = [:]
-  var boolFlags: Set<String> = []
-
-  func getFlag(_ names: String...) -> String? {
-    return getFlagFromArray(names)
-  }
-
-  func getFlagFromArray(_ names: [String]) -> String? {
-    for name in names {
-      if let value = flags[name] {
-        return value
-      }
-    }
-    return nil
-  }
-
-  func hasFlag(_ names: String...) -> Bool {
-    return hasFlagFromArray(names)
-  }
-
-  func hasFlagFromArray(_ names: [String]) -> Bool {
-    for name in names {
-      if boolFlags.contains(name) {
-        return true
-      }
-    }
-    return false
-  }
-
-  func requireFlag(_ names: String..., error: String) throws -> String {
-    guard let value = getFlagFromArray(names) else {
-      throw ProjectError.invalidArguments(error)
-    }
-    return value
-  }
-}
-
-func parseArguments(_ args: [String]) -> ParsedArguments {
-  var parsed = ParsedArguments()
-  var i = 0
-
-  while i < args.count {
-    let arg = args[i]
-
-    if arg.hasPrefix("--") || arg.hasPrefix("-") {
-      let flagName = arg
-
-      // Check if it's a boolean flag or has a value
-      if i + 1 < args.count && !args[i + 1].hasPrefix("-") {
-        // Flag with value
-        parsed.flags[flagName] = args[i + 1]
-        i += 2
-      } else {
-        // Boolean flag
-        parsed.boolFlags.insert(flagName)
-        i += 1
-      }
-    } else {
-      // Positional argument
-      parsed.positional.append(arg)
-      i += 1
-    }
-  }
-
-  return parsed
-}
-
-// Enhanced file filtering
-func shouldIncludeFile(_ path: String) -> Bool {
-  let filename = (path as NSString).lastPathComponent
-  let excludedFiles = [".DS_Store", "Thumbs.db", ".git", ".gitignore", ".gitkeep"]
-  let excludedExtensions = [".orig", ".bak", ".tmp", ".temp"]
-
-  // Skip hidden files (starting with .)
-  if filename.hasPrefix(".") && !filename.hasSuffix(".h") && !filename.hasSuffix(".m") {
-    return false
-  }
-
-  // Skip excluded files
-  if excludedFiles.contains(filename) {
-    return false
-  }
-
-  // Skip excluded extensions
-  for ext in excludedExtensions {
-    if filename.hasSuffix(ext) {
-      return false
-    }
-  }
-
-  return true
-}
-
-// Check if file should be added to compile sources
-func isCompilableFile(_ path: String) -> Bool {
-  let compilableExtensions = ["swift", "m", "mm", "cpp", "cc", "cxx", "c"]
-  return compilableExtensions.contains((path as NSString).pathExtension.lowercased())
-}
-
-// Enhanced group finding with better path resolution
-func findGroupByPath(_ path: String, in groups: [PBXGroup], rootGroup: PBXGroup) -> PBXGroup? {
-  let pathComponents = path.split(separator: "/").map(String.init)
-  var currentGroup = rootGroup
-
-  for component in pathComponents {
-    guard
-      let nextGroup = currentGroup.children.compactMap({ $0 as? PBXGroup })
-        .first(where: { $0.name == component || $0.path == component })
-    else {
-      return nil
-    }
-    currentGroup = nextGroup
-  }
-
-  return currentGroup
-}
-
-// MARK: - XcodeProj Utility
+import XcodeProj
 class XcodeProjUtility {
   let xcodeproj: XcodeProj
   let projectPath: Path
   let pbxproj: PBXProj
   private var transactionBackupPath: Path?
+  private lazy var buildPhaseManager = BuildPhaseManager(pbxproj: pbxproj)
+  private let cacheManager: CacheManager
+  private let profiler: PerformanceProfiler?
 
-  init(path: String = "MyProject.xcodeproj") throws {
+  init(path: String = "MyProject.xcodeproj", verbose: Bool = false) throws {
     // Resolve path relative to current working directory, not script location
     if path.hasPrefix("/") {
       // Absolute path
@@ -264,6 +31,8 @@ class XcodeProjUtility {
 
     self.xcodeproj = try XcodeProj(path: projectPath)
     self.pbxproj = xcodeproj.pbxproj
+    self.cacheManager = CacheManager(pbxproj: pbxproj)
+    self.profiler = verbose ? PerformanceProfiler(verbose: verbose) : nil
   }
 
   // MARK: - Transaction Support
@@ -316,6 +85,12 @@ class XcodeProjUtility {
 
   // MARK: - File Operations
   func addFile(path: String, to groupPath: String, targets: [String]) throws {
+    try profiler?.measureOperation("addFile-\(path)") {
+      try _addFile(path: path, to: groupPath, targets: targets)
+    } ?? _addFile(path: path, to: groupPath, targets: targets)
+  }
+  
+  private func _addFile(path: String, to groupPath: String, targets: [String]) throws {
     // Validate path
     guard sanitizePath(path) != nil else {
       throw ProjectError.invalidArguments("Invalid file path: \(path)")
@@ -323,14 +98,14 @@ class XcodeProjUtility {
 
     let fileName = (path as NSString).lastPathComponent
 
-    // Check if file already exists
-    if fileExists(path: fileName, in: pbxproj) {
+    // Check if file already exists using cache
+    if cacheManager.getFileReference(fileName) != nil {
       print("⚠️  File \(fileName) already exists, skipping")
       return
     }
 
-    // Find parent group
-    guard let parentGroup = findGroup(named: groupPath, in: pbxproj.groups) else {
+    // Find parent group using cache
+    guard let parentGroup = cacheManager.getGroup(groupPath) ?? findGroup(named: groupPath, in: pbxproj.groups) else {
       throw ProjectError.groupNotFound(groupPath)
     }
 
@@ -344,35 +119,16 @@ class XcodeProjUtility {
     // Add to project
     pbxproj.add(object: fileRef)
     parentGroup.children.append(fileRef)
+    
+    // Invalidate cache since we added a new file
+    cacheManager.invalidateFileReference(fileName)
 
-    // Add to targets (only compilable files go to sources build phase)
-    for targetName in targets {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
-        print("⚠️  Target '\(targetName)' not found")
-        continue
-      }
-
-      if isCompilableFile(path) {
-        // Add to sources build phase
-        guard let sourcesBuildPhase = sourceBuildPhase(for: target) else {
-          print("⚠️  Target '\(targetName)' has no sources build phase")
-          continue
-        }
-
-        let buildFile = PBXBuildFile(file: fileRef)
-        pbxproj.add(object: buildFile)
-        sourcesBuildPhase.files?.append(buildFile)
-      } else {
-        // Add to resources build phase for non-compilable files
-        if let resourcesBuildPhase = target.buildPhases.first(where: {
-          $0 is PBXResourcesBuildPhase
-        }) as? PBXResourcesBuildPhase {
-          let buildFile = PBXBuildFile(file: fileRef)
-          pbxproj.add(object: buildFile)
-          resourcesBuildPhase.files?.append(buildFile)
-        }
-      }
-    }
+    // Add to targets using BuildPhaseManager
+    buildPhaseManager.addFileToBuildPhases(
+      fileReference: fileRef,
+      targets: targets,
+      isCompilable: isCompilableFile(path)
+    )
 
     print("✅ Added \(fileName) to \(targets.joined(separator: ", "))")
   }
@@ -462,20 +218,12 @@ class XcodeProjUtility {
         pbxproj.add(object: fileRef)
         group.children.append(fileRef)
 
-        // Add to targets if compilable
-        if isCompilableFile(fileName) {
-          for targetName in targets {
-            guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
-              let sourcesBuildPhase = sourceBuildPhase(for: target)
-            else {
-              continue
-            }
-
-            let buildFile = PBXBuildFile(file: fileRef)
-            pbxproj.add(object: buildFile)
-            sourcesBuildPhase.files?.append(buildFile)
-          }
-        }
+        // Add to targets using BuildPhaseManager
+        buildPhaseManager.addFileToBuildPhases(
+          fileReference: fileRef,
+          targets: targets,
+          isCompilable: isCompilableFile(fileName)
+        )
 
         print("  📄 Added: \(relativePath)")
       }
@@ -519,41 +267,8 @@ class XcodeProjUtility {
       throw ProjectError.operationFailed("File not found: \(filePath)")
     }
 
-    var buildFilesToDelete: Set<PBXBuildFile> = []
-
     // Collect all build files that reference this file
-    for target in pbxproj.nativeTargets {
-      for buildPhase in target.buildPhases {
-        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-          if let files = sourcesBuildPhase.files {
-            for buildFile in files where buildFile.file === fileRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          if let files = resourcesBuildPhase.files {
-            for buildFile in files where buildFile.file === fileRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-          if let files = frameworksBuildPhase.files {
-            for buildFile in files where buildFile.file === fileRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          if let files = copyFilesBuildPhase.files {
-            for buildFile in files where buildFile.file === fileRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-      }
-    }
+    let buildFilesToDelete = buildPhaseManager.findBuildFiles(for: fileRef)
 
     // Remove from all groups
     for group in pbxproj.groups {
@@ -561,22 +276,7 @@ class XcodeProjUtility {
     }
 
     // Remove build files from all build phases
-    for target in pbxproj.nativeTargets {
-      for buildPhase in target.buildPhases {
-        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-      }
-    }
+    buildPhaseManager.removeBuildFiles { buildFilesToDelete.contains($0) }
 
     // Delete all collected build files from the project
     for buildFile in buildFilesToDelete {
@@ -629,18 +329,23 @@ class XcodeProjUtility {
     throw ProjectError.groupNotFound(groupPath)
   }
 
-  private func removeGroupHierarchy(_ group: PBXGroup) {
-    // Recursively collect all file references in this group and subgroups
+  // MARK: - Group Removal Helper Methods
+  
+  /// Contains collected contents from a group hierarchy
+  private struct GroupContents {
+    let filesToRemove: [PBXFileReference]
+    let groupsToRemove: [PBXGroup]
+    let variantGroupsToRemove: [PBXVariantGroup]
+  }
+  
+  /// Recursively collects all files and subgroups from a group hierarchy
+  private func collectGroupContents(from group: PBXGroup) -> GroupContents {
     var filesToRemove: [PBXFileReference] = []
     var groupsToRemove: [PBXGroup] = [group]
     var variantGroupsToRemove: [PBXVariantGroup] = []
-    var allChildrenToRemove: [PBXFileElement] = []
-    var buildFilesToDelete: Set<PBXBuildFile> = []
-
-    func collectFilesAndGroups(from group: PBXGroup) {
+    
+    func collectFromGroup(_ group: PBXGroup) {
       for child in group.children {
-        allChildrenToRemove.append(child)
-
         if let fileRef = child as? PBXFileReference {
           filesToRemove.append(fileRef)
         } else if let variantGroup = child as? PBXVariantGroup {
@@ -653,138 +358,88 @@ class XcodeProjUtility {
           }
         } else if let subgroup = child as? PBXGroup {
           groupsToRemove.append(subgroup)
-          collectFilesAndGroups(from: subgroup)
+          collectFromGroup(subgroup)
         }
       }
     }
-
-    collectFilesAndGroups(from: group)
-
-    // First, collect all build files that need to be removed
-    for fileRef in filesToRemove {
-      // Collect build files from all build phases
-      for target in pbxproj.nativeTargets {
-        for buildPhase in target.buildPhases {
-          if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-            if let files = sourcesBuildPhase.files {
-              for buildFile in files where buildFile.file === fileRef {
-                buildFilesToDelete.insert(buildFile)
-              }
-            }
-          }
-          if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            if let files = resourcesBuildPhase.files {
-              for buildFile in files where buildFile.file === fileRef {
-                buildFilesToDelete.insert(buildFile)
-              }
-            }
-          }
-          if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-            if let files = frameworksBuildPhase.files {
-              for buildFile in files where buildFile.file === fileRef {
-                buildFilesToDelete.insert(buildFile)
-              }
-            }
-          }
-          if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            if let files = copyFilesBuildPhase.files {
-              for buildFile in files where buildFile.file === fileRef {
-                buildFilesToDelete.insert(buildFile)
-              }
-            }
-          }
-        }
-      }
+    
+    collectFromGroup(group)
+    
+    return GroupContents(
+      filesToRemove: filesToRemove,
+      groupsToRemove: groupsToRemove,
+      variantGroupsToRemove: variantGroupsToRemove
+    )
+  }
+  
+  /// Removes file references from all build phases using BuildPhaseManager
+  private func removeFilesFromBuildPhases(_ files: [PBXFileReference]) {
+    // Collect all build files that need to be removed
+    var buildFilesToDelete: Set<PBXBuildFile> = []
+    for fileRef in files {
+      buildFilesToDelete.formUnion(buildPhaseManager.findBuildFiles(for: fileRef))
     }
-
+    
     // Remove build files from their respective build phases
-    for target in pbxproj.nativeTargets {
-      for buildPhase in target.buildPhases {
-        if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-          sourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-          frameworksBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-      }
-    }
-
+    buildPhaseManager.removeBuildFiles { buildFilesToDelete.contains($0) }
+    
     // Delete all collected build files from the project
     for buildFile in buildFilesToDelete {
       pbxproj.delete(object: buildFile)
     }
-
+  }
+  
+  /// Deletes the group and all its collected contents from the project
+  private func deleteGroupAndContents(_ group: PBXGroup, contents: GroupContents) {
     // Remove file references from project
-    for fileRef in filesToRemove {
+    for fileRef in contents.filesToRemove {
       pbxproj.delete(object: fileRef)
     }
-
+    
     // Remove variant groups from project
-    for variantGroup in variantGroupsToRemove {
+    for variantGroup in contents.variantGroupsToRemove {
       pbxproj.delete(object: variantGroup)
     }
-
+    
     // Remove the group from its parent (including main project group)
     for parentGroup in pbxproj.groups {
       parentGroup.children.removeAll { $0 === group }
     }
-
+    
     // Also check if the group is in the main project's mainGroup
     if let mainGroup = pbxproj.rootObject?.mainGroup {
       mainGroup.children.removeAll { $0 === group }
     }
-
+    
     // Remove all groups from project
-    for groupToRemove in groupsToRemove {
+    for groupToRemove in contents.groupsToRemove {
       pbxproj.delete(object: groupToRemove)
     }
   }
+  
+  /// Removes a group hierarchy and all its contents from the project
+  private func removeGroupHierarchy(_ group: PBXGroup) {
+    // Step 1: Collect all contents from the group hierarchy
+    let contents = collectGroupContents(from: group)
+    
+    // Step 2: Remove files from build phases
+    removeFilesFromBuildPhases(contents.filesToRemove)
+    
+    // Step 3: Delete the group and all its contents
+    deleteGroupAndContents(group, contents: contents)
+  }
 
   private func removeFolderReference(_ folderRef: PBXFileReference) {
-    var buildFilesToDelete: Set<PBXBuildFile> = []
-
     // Collect all build files that reference this folder
-    for target in pbxproj.nativeTargets {
-      for buildPhase in target.buildPhases {
-        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          if let files = resourcesBuildPhase.files {
-            for buildFile in files where buildFile.file === folderRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          if let files = copyFilesBuildPhase.files {
-            for buildFile in files where buildFile.file === folderRef {
-              buildFilesToDelete.insert(buildFile)
-            }
-          }
-        }
-      }
-    }
+    let buildFilesToDelete = buildPhaseManager.findBuildFiles(for: folderRef)
 
     // Remove from all groups
     for group in pbxproj.groups {
       group.children.removeAll { $0 === folderRef }
     }
 
-    // Remove build files from resource build phases
-    for target in pbxproj.nativeTargets {
-      for buildPhase in target.buildPhases {
-        if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-          resourcesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-        if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-          copyFilesBuildPhase.files?.removeAll { buildFilesToDelete.contains($0) }
-        }
-      }
-    }
+    // Remove build files from build phases
+    buildPhaseManager.removeBuildFiles { buildFilesToDelete.contains($0) }
 
     // Delete all collected build files from the project
     for buildFile in buildFilesToDelete {
@@ -885,8 +540,8 @@ class XcodeProjUtility {
   func addTarget(name: String, productType: String, bundleId: String, platform: String = "iOS")
     throws
   {
-    // Check if target already exists
-    if pbxproj.nativeTargets.contains(where: { $0.name == name }) {
+    // Check if target already exists using cache
+    if cacheManager.getTarget(name) != nil {
       throw ProjectError.operationFailed("Target \(name) already exists")
     }
 
@@ -936,17 +591,21 @@ class XcodeProjUtility {
 
     pbxproj.add(object: target)
     pbxproj.rootObject?.targets.append(target)
+    
+    // Invalidate cache to pick up new target
+    cacheManager.invalidateTarget(name)
+    cacheManager.rebuildAllCaches()
 
     print("✅ Added target: \(name) (\(productType))")
   }
 
   func duplicateTarget(source: String, newName: String, newBundleId: String? = nil) throws {
-    guard let sourceTarget = pbxproj.nativeTargets.first(where: { $0.name == source }) else {
+    guard let sourceTarget = cacheManager.getTarget(source) else {
       throw ProjectError.targetNotFound(source)
     }
 
-    // Check if new target already exists
-    if pbxproj.nativeTargets.contains(where: { $0.name == newName }) {
+    // Check if new target already exists using cache
+    if cacheManager.getTarget(newName) != nil {
       throw ProjectError.operationFailed("Target \(newName) already exists")
     }
 
@@ -1006,12 +665,16 @@ class XcodeProjUtility {
 
     pbxproj.add(object: newTarget)
     pbxproj.rootObject?.targets.append(newTarget)
+    
+    // Invalidate cache to pick up new target
+    cacheManager.invalidateTarget(newName)
+    cacheManager.rebuildAllCaches()
 
     print("✅ Duplicated target: \(source) -> \(newName)")
   }
 
   func removeTarget(name: String) throws {
-    guard let target = pbxproj.nativeTargets.first(where: { $0.name == name }) else {
+    guard let target = cacheManager.getTarget(name) else {
       throw ProjectError.targetNotFound(name)
     }
 
@@ -1027,17 +690,20 @@ class XcodeProjUtility {
 
     // Remove from project
     pbxproj.delete(object: target)
+    
+    // Invalidate cache
+    cacheManager.invalidateTarget(name)
 
     print("✅ Removed target: \(name)")
   }
 
   // MARK: - Dependencies & Frameworks
   func addDependency(to targetName: String, dependsOn dependencyName: String) throws {
-    guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+    guard let target = cacheManager.getTarget(targetName) else {
       throw ProjectError.targetNotFound(targetName)
     }
 
-    guard let dependency = pbxproj.nativeTargets.first(where: { $0.name == dependencyName }) else {
+    guard let dependency = cacheManager.getTarget(dependencyName) else {
       throw ProjectError.targetNotFound(dependencyName)
     }
 
@@ -1055,7 +721,7 @@ class XcodeProjUtility {
   }
 
   func addFramework(name: String, to targetName: String, embed: Bool = false) throws {
-    guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+    guard let target = cacheManager.getTarget(targetName) else {
       throw ProjectError.targetNotFound(targetName)
     }
 
@@ -1161,7 +827,7 @@ class XcodeProjUtility {
 
     // Add to target if specified
     if let targetName = targetName {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+      guard cacheManager.getTarget(targetName) != nil else {
         throw ProjectError.targetNotFound(targetName)
       }
 
@@ -1244,9 +910,74 @@ class XcodeProjUtility {
   }
 
   func addFiles(_ files: [(path: String, group: String)], to targets: [String]) throws {
-    for (path, group) in files {
-      try addFile(path: path, to: group, targets: targets)
+    guard !files.isEmpty else { return }
+    
+    // Batch operation with single save at the end
+    try profiler?.measureOperation("addFiles-batch-\(files.count)") {
+      try _addFilesBatch(files, to: targets)
+    } ?? _addFilesBatch(files, to: targets)
+  }
+  
+  private func _addFilesBatch(_ files: [(path: String, group: String)], to targets: [String]) throws {
+    print("📁 Adding \(files.count) files in batch...")
+    
+    var addedFiles = 0
+    var skippedFiles = 0
+    
+    for (path, groupPath) in files {
+      do {
+        // Validate path
+        guard sanitizePath(path) != nil else {
+          throw ProjectError.invalidArguments("Invalid file path: \(path)")
+        }
+
+        let fileName = (path as NSString).lastPathComponent
+
+        // Check if file already exists using cache
+        if cacheManager.getFileReference(fileName) != nil {
+          print("⚠️  File \(fileName) already exists, skipping")
+          skippedFiles += 1
+          continue
+        }
+
+        // Find parent group using cache
+        guard let parentGroup = cacheManager.getGroup(groupPath) ?? findGroup(named: groupPath, in: pbxproj.groups) else {
+          throw ProjectError.groupNotFound(groupPath)
+        }
+
+        // Create file reference
+        let fileRef = PBXFileReference(
+          sourceTree: .group,
+          lastKnownFileType: fileType(for: path),
+          path: fileName
+        )
+
+        // Add to project
+        pbxproj.add(object: fileRef)
+        parentGroup.children.append(fileRef)
+        
+        // Invalidate cache since we added a new file
+        cacheManager.invalidateFileReference(fileName)
+
+        // Add to targets using BuildPhaseManager
+        buildPhaseManager.addFileToBuildPhases(
+          fileReference: fileRef,
+          targets: targets,
+          isCompilable: isCompilableFile(path)
+        )
+        
+        addedFiles += 1
+        
+        if profiler != nil {
+          print("  ✅ Added \(fileName) (\(addedFiles)/\(files.count))")
+        }
+      } catch {
+        print("❌ Failed to add \(path): \(error.localizedDescription)")
+        throw error
+      }
     }
+    
+    print("✅ Batch complete: \(addedFiles) added, \(skippedFiles) skipped")
   }
 
   // MARK: - Path Updates
@@ -1283,6 +1014,17 @@ class XcodeProjUtility {
 
   // MARK: - Group Management
   func ensureGroupHierarchy(_ path: String) -> PBXGroup? {
+    return profiler?.measureOperation("ensureGroupHierarchy-\(path)") {
+      return _ensureGroupHierarchy(path)
+    } ?? _ensureGroupHierarchy(path)
+  }
+  
+  private func _ensureGroupHierarchy(_ path: String) -> PBXGroup? {
+    // Check cache first
+    if let cachedGroup = cacheManager.getGroup(path) {
+      return cachedGroup
+    }
+    
     let components = path.split(separator: "/").map(String.init)
     guard let mainGroup = pbxproj.rootObject?.mainGroup else {
       print("⚠️  No main group found in project")
@@ -1290,8 +1032,17 @@ class XcodeProjUtility {
     }
 
     var currentGroup = mainGroup
+    var currentPath = ""
 
     for component in components {
+      currentPath = currentPath.isEmpty ? component : "\(currentPath)/\(component)"
+      
+      // Check cache for this path segment
+      if let cachedSegment = cacheManager.getGroup(currentPath) {
+        currentGroup = cachedSegment
+        continue
+      }
+      
       // Look for existing child group
       if let existingGroup = currentGroup.children.compactMap({ $0 as? PBXGroup })
         .first(where: { $0.name == component || $0.path == component })
@@ -1309,6 +1060,9 @@ class XcodeProjUtility {
         pbxproj.add(object: newGroup)
         currentGroup.children.append(newGroup)
         currentGroup = newGroup
+        
+        // Invalidate cache since we created a new group
+        cacheManager.invalidateGroup(currentPath)
 
         print("📁 Created group: \(component)")
       }
@@ -1338,7 +1092,7 @@ class XcodeProjUtility {
   // MARK: - Build Settings & Configuration
   func updateBuildSettings(targets: [String], update: (inout BuildSettings) -> Void) {
     for targetName in targets {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
+      guard let target = cacheManager.getTarget(targetName),
         let configList = target.buildConfigurationList
       else {
         print("⚠️  Target '\(targetName)' not found")
@@ -1355,7 +1109,7 @@ class XcodeProjUtility {
   func setBuildSetting(key: String, value: String, targets: [String], configuration: String? = nil)
   {
     for targetName in targets {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
+      guard let target = cacheManager.getTarget(targetName),
         let configList = target.buildConfigurationList
       else {
         print("⚠️  Target '\(targetName)' not found")
@@ -1375,7 +1129,7 @@ class XcodeProjUtility {
   func getBuildSettings(for targetName: String, configuration: String? = nil) -> [String: [String:
     Any]]
   {
-    guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
+    guard let target = cacheManager.getTarget(targetName),
       let configList = target.buildConfigurationList
     else {
       print("⚠️  Target '\(targetName)' not found")
@@ -1396,7 +1150,7 @@ class XcodeProjUtility {
 
   func listBuildConfigurations(for targetName: String? = nil) {
     if let targetName = targetName {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+      guard let target = cacheManager.getTarget(targetName) else {
         print("⚠️  Target '\(targetName)' not found")
         return
       }
@@ -1424,178 +1178,249 @@ class XcodeProjUtility {
     outputJSON: Bool = false, showAll: Bool = false
   ) {
     if outputJSON {
-      listBuildSettingsJSON(
+      outputJSONBuildSettings(
         targetName: targetName, configuration: configuration,
         showInherited: showInherited, showAll: showAll
       )
       return
     }
 
+    outputConsoleBuildSettings(
+      targetName: targetName, configuration: configuration,
+      showInherited: showInherited, showAll: showAll
+    )
+  }
+
+  // MARK: - Build Settings Data Collection
+  
+  /// Collects project-level build settings data
+  private func collectProjectBuildSettings(
+    configuration: String? = nil
+  ) -> (settingsData: [String: [String: Any]], allKeys: Set<String>, activeConfigs: [String]) {
+    guard let configList = pbxproj.rootObject?.buildConfigurationList else {
+      return ([:], [], [])
+    }
+
+    let configs = configList.buildConfigurations
+    let configNames = configs.map { $0.name }
+    
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+    }
+
+    let activeConfigs = configuration.map { [$0] } ?? configNames
+    return (settingsData, allSettingKeys, activeConfigs)
+  }
+  
+  /// Collects target-level build settings data with inheritance info
+  private func collectTargetBuildSettings(
+    target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
+  ) -> (
+    settingsData: [String: [String: Any]], 
+    projectSettingsData: [String: [String: Any]], 
+    allKeys: Set<String>, 
+    activeConfigs: [String]
+  ) {
+    guard let targetConfigList = target.buildConfigurationList else {
+      return ([:], [:], [], [])
+    }
+
+    let configs = targetConfigList.buildConfigurations
+    let configNames = configs.map { $0.name }
+    let projectConfigList = pbxproj.rootObject?.buildConfigurationList
+    
+    var allSettingKeys = Set<String>()
+    var settingsData: [String: [String: Any]] = [:]
+    var projectSettingsData: [String: [String: Any]] = [:]
+
+    for config in configs {
+      if let filterConfig = configuration, config.name != filterConfig {
+        continue
+      }
+
+      settingsData[config.name] = config.buildSettings
+      allSettingKeys.formUnion(config.buildSettings.keys)
+
+      // Get project settings for this config
+      if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
+        $0.name == config.name
+      }) {
+        projectSettingsData[config.name] = projectConfig.buildSettings
+        if showInherited {
+          allSettingKeys.formUnion(projectConfig.buildSettings.keys)
+        }
+      }
+    }
+
+    let activeConfigs = configuration.map { [$0] } ?? configNames
+    return (settingsData, projectSettingsData, allSettingKeys, activeConfigs)
+  }
+  
+  // MARK: - Build Settings Output Formatting
+  
+  /// Formats and displays project build settings to console
+  private func formatProjectBuildSettingsOutput(
+    settingsData: [String: [String: Any]], allKeys: Set<String>, activeConfigs: [String]
+  ) {
+    if allKeys.isEmpty {
+      print("  (No explicit settings defined)")
+      return
+    }
+
+    let sortedKeys = allKeys.sorted()
+
+    for key in sortedKeys {
+      var values: [String: String] = [:]
+
+      for configName in activeConfigs {
+        if let value = settingsData[configName]?[key] {
+          values[configName] = formatBuildSettingValue(value)
+        }
+      }
+
+      let uniqueValues = Set(values.values)
+
+      if uniqueValues.count == 1, let singleValue = values.values.first {
+        print("  \(key): \(singleValue)")
+      } else {
+        print("  \(key)")
+        for configName in activeConfigs.sorted() {
+          if let value = values[configName] {
+            print("    \(configName): \(value)")
+          }
+        }
+      }
+    }
+  }
+  
+  /// Formats and displays target build settings to console
+  private func formatTargetBuildSettingsOutput(
+    settingsData: [String: [String: Any]],
+    projectSettingsData: [String: [String: Any]],
+    allKeys: Set<String>,
+    activeConfigs: [String],
+    showInherited: Bool
+  ) {
+    if allKeys.isEmpty && !showInherited {
+      print("  (No explicit settings defined at target level)")
+      return
+    }
+
+    let sortedKeys = allKeys.sorted()
+
+    for key in sortedKeys {
+      let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
+        key: key,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        projectSettingsData: projectSettingsData,
+        showInherited: showInherited
+      )
+
+      if !hasTargetSetting && !showInherited {
+        continue
+      }
+
+      displaySettingValues(
+        key: key,
+        values: values,
+        inheritedValues: inheritedValues,
+        isInheritedOnly: isInheritedOnly,
+        activeConfigs: activeConfigs,
+        settingsData: settingsData,
+        showInherited: showInherited
+      )
+    }
+  }
+  
+  // MARK: - Build Settings Output Coordination
+  
+  /// Handles JSON output for build settings
+  private func outputJSONBuildSettings(
+    targetName: String? = nil, configuration: String? = nil,
+    showInherited: Bool = false, showAll: Bool = false
+  ) {
+    listBuildSettingsJSON(
+      targetName: targetName, configuration: configuration,
+      showInherited: showInherited, showAll: showAll
+    )
+  }
+  
+  /// Handles console output for build settings
+  private func outputConsoleBuildSettings(
+    targetName: String? = nil, configuration: String? = nil,
+    showInherited: Bool = false, showAll: Bool = false
+  ) {
     if showAll {
       listAllBuildSettings(configuration: configuration, showInherited: showInherited)
       return
     }
+    
     if let targetName = targetName {
-      // Target-level build settings with project inheritance info
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }),
-        let targetConfigList = target.buildConfigurationList
-      else {
-        print("⚠️  Target '\(targetName)' not found")
-        print("Available targets: \(pbxproj.nativeTargets.map { $0.name }.joined(separator: ", "))")
-        exit(1)
-      }
-
-      print("🎯 Build Settings for Target: \(targetName)")
-      print("─" + String(repeating: "─", count: 80))
-      print("")
-
-      // Get all configurations
-      let configs = targetConfigList.buildConfigurations
-      let configNames = configs.map { $0.name }
-
-      // Get project-level settings for comparison
-      let projectConfigList = pbxproj.rootObject?.buildConfigurationList
-
-      // Collect all unique setting keys across all configurations
-      var allSettingKeys = Set<String>()
-      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
-      var projectSettingsData: [String: [String: Any]] = [:]  // For inheritance tracking
-
-      for config in configs {
-        if let filterConfig = configuration, config.name != filterConfig {
-          continue
-        }
-
-        settingsData[config.name] = config.buildSettings
-        allSettingKeys.formUnion(config.buildSettings.keys)
-
-        // Get project settings for this config
-        if let projectConfig = projectConfigList?.buildConfigurations.first(where: {
-          $0.name == config.name
-        }) {
-          projectSettingsData[config.name] = projectConfig.buildSettings
-          if showInherited {
-            allSettingKeys.formUnion(projectConfig.buildSettings.keys)
-          }
-        }
-      }
-
-      // Filter configs if specific configuration requested
-      let activeConfigs: [String]
-      if let config = configuration {
-        activeConfigs = [config]
-      } else {
-        activeConfigs = configNames
-      }
-
-      if allSettingKeys.isEmpty && !showInherited {
-        print("  (No explicit settings defined at target level)")
-        return
-      }
-
-      // Sort settings alphabetically
-      let sortedKeys = allSettingKeys.sorted()
-
-      // Display each setting with its values across configurations
-      for key in sortedKeys {
-        let (values, inheritedValues, hasTargetSetting, isInheritedOnly) = collectSettingValues(
-          key: key,
-          activeConfigs: activeConfigs,
-          settingsData: settingsData,
-          projectSettingsData: projectSettingsData,
-          showInherited: showInherited
-        )
-
-        if !hasTargetSetting && !showInherited {
-          continue  // Skip inherited-only settings if not showing inherited
-        }
-
-        displaySettingValues(
-          key: key,
-          values: values,
-          inheritedValues: inheritedValues,
-          isInheritedOnly: isInheritedOnly,
-          activeConfigs: activeConfigs,
-          settingsData: settingsData,
-          showInherited: showInherited
-        )
-      }
-
-      print("")
+      outputTargetBuildSettings(
+        targetName: targetName, configuration: configuration, showInherited: showInherited
+      )
     } else {
-      // Project-level build settings
-      guard let configList = pbxproj.rootObject?.buildConfigurationList else {
-        print("⚠️  No project build configuration found")
-        exit(1)
-      }
-
-      let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
-      print("🏗️  Build Settings for Project: \(projectName)")
-      print("─" + String(repeating: "─", count: 80))
-      print("")
-
-      // Get all configurations
-      let configs = configList.buildConfigurations
-      let configNames = configs.map { $0.name }
-
-      // Collect all unique setting keys across all configurations
-      var allSettingKeys = Set<String>()
-      var settingsData: [String: [String: Any]] = [:]  // [ConfigName: [SettingKey: Value]]
-
-      for config in configs {
-        if let filterConfig = configuration, config.name != filterConfig {
-          continue
-        }
-
-        settingsData[config.name] = config.buildSettings
-        allSettingKeys.formUnion(config.buildSettings.keys)
-      }
-
-      // Filter configs if specific configuration requested
-      let activeConfigs: [String]
-      if let config = configuration {
-        activeConfigs = [config]
-      } else {
-        activeConfigs = configNames
-      }
-
-      if allSettingKeys.isEmpty {
-        print("  (No explicit settings defined)")
-        return
-      }
-
-      // Sort settings alphabetically
-      let sortedKeys = allSettingKeys.sorted()
-
-      // Display each setting with its values across configurations
-      for key in sortedKeys {
-        var values: [String: String] = [:]  // [ConfigName: FormattedValue]
-
-        for configName in activeConfigs {
-          if let value = settingsData[configName]?[key] {
-            values[configName] = formatBuildSettingValue(value)
-          }
-        }
-
-        // Check if all configs have the same value
-        let uniqueValues = Set(values.values)
-
-        if uniqueValues.count == 1, let singleValue = values.values.first {
-          // Same value across all configurations - display inline
-          print("  \(key): \(singleValue)")
-        } else {
-          // Different values per configuration - show on separate lines
-          print("  \(key)")
-          for configName in activeConfigs.sorted() {
-            if let value = values[configName] {
-              print("    \(configName): \(value)")
-            }
-          }
-        }
-      }
-
-      print("")
+      outputProjectBuildSettings(configuration: configuration)
     }
+  }
+  
+  /// Outputs build settings for a specific target
+  private func outputTargetBuildSettings(
+    targetName: String, configuration: String? = nil, showInherited: Bool = false
+  ) {
+    guard let target = cacheManager.getTarget(targetName) else {
+      print("⚠️  Target '\(targetName)' not found")
+      print("Available targets: \(pbxproj.nativeTargets.map { $0.name }.joined(separator: ", "))")
+      exit(1)
+    }
+
+    print("🎯 Build Settings for Target: \(targetName)")
+    print("─" + String(repeating: "─", count: 80))
+    print("")
+
+    let (settingsData, projectSettingsData, allKeys, activeConfigs) = collectTargetBuildSettings(
+      target: target, configuration: configuration, showInherited: showInherited
+    )
+    
+    formatTargetBuildSettingsOutput(
+      settingsData: settingsData,
+      projectSettingsData: projectSettingsData,
+      allKeys: allKeys,
+      activeConfigs: activeConfigs,
+      showInherited: showInherited
+    )
+
+    print("")
+  }
+  
+  /// Outputs build settings for the project
+  private func outputProjectBuildSettings(configuration: String? = nil) {
+    guard pbxproj.rootObject?.buildConfigurationList != nil else {
+      print("⚠️  No project build configuration found")
+      exit(1)
+    }
+
+    let projectName = pbxproj.rootObject?.name ?? projectPath.lastComponentWithoutExtension
+    print("🏗️  Build Settings for Project: \(projectName)")
+    print("─" + String(repeating: "─", count: 80))
+    print("")
+
+    let (settingsData, allKeys, activeConfigs) = collectProjectBuildSettings(configuration: configuration)
+    
+    formatProjectBuildSettingsOutput(
+      settingsData: settingsData, allKeys: allKeys, activeConfigs: activeConfigs
+    )
+
+    print("")
   }
 
   private func formatBuildSettingValue(_ value: Any) -> String {
@@ -1713,7 +1538,7 @@ class XcodeProjUtility {
       // All targets
       var targetsSettings: [String: Any] = [:]
       for target in pbxproj.nativeTargets {
-        if let configList = target.buildConfigurationList {
+        if target.buildConfigurationList != nil {
           let targetData = collectTargetBuildSettingsData(
             target: target,
             configuration: configuration,
@@ -1727,7 +1552,7 @@ class XcodeProjUtility {
 
     } else if let targetName = targetName {
       // Specific target
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+      guard let target = cacheManager.getTarget(targetName) else {
         let errorDict =
           [
             "error": "Target '\(targetName)' not found",
@@ -1964,7 +1789,7 @@ class XcodeProjUtility {
     }
 
     // Filter configs if specific configuration requested
-    let activeConfigs = configuration != nil ? [configuration!] : configNames
+    let activeConfigs = configuration.map { [$0] } ?? configNames
 
     if allSettingKeys.isEmpty {
       print("  (No explicit settings defined)")
@@ -2119,153 +1944,32 @@ class XcodeProjUtility {
     print("🔍 Checking for invalid file and folder references...")
 
     var invalidRefs: [(group: String, path: String, issue: String)] = []
-    let fileManager = FileManager.default
-    let projectDir = projectPath.parent()
-
-    // Helper to resolve absolute path for a file reference
-    func resolveAbsolutePath(for fileRef: PBXFileReference, in group: PBXGroup?) -> Path? {
-      // Get the path from the file reference
-      guard let filePath = fileRef.path ?? fileRef.name else { return nil }
-
-      // Start with project directory
-      var basePath = projectDir
-
-      // If file has a source tree, handle it
-      if let sourceTree = fileRef.sourceTree {
-        switch sourceTree {
-        case .absolute:
-          return Path(filePath)
-        case .group:
-          // Need to calculate path from group hierarchy
-          if let group = group {
-            var groupPath = Path("")
-            var currentGroup: PBXGroup? = group
-            var pathComponents: [String] = []
-
-            // Build path from group hierarchy
-            while let g = currentGroup {
-              if let path = g.path, !path.isEmpty {
-                pathComponents.insert(path, at: 0)
-              }
-              // Find parent group
-              currentGroup = pbxproj.groups.first { parent in
-                parent.children.contains { $0 === g }
-              }
-            }
-
-            for component in pathComponents {
-              groupPath = groupPath + Path(component)
-            }
-            basePath = basePath + groupPath
-          }
-        case .sourceRoot:
-          // Relative to project root
-          basePath = projectDir
-        default:
-          break
-        }
-      }
-
-      return basePath + Path(filePath)
-    }
-
-    // Helper to resolve absolute path for a group (folder)
-    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
-      // Skip groups without a path (they're just organizational)
-      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
-
-      var basePath = projectDir
-      var pathComponents: [String] = []
-      var currentGroup: PBXGroup? = group
-
-      // Build path from group hierarchy
-      while let g = currentGroup {
-        if let path = g.path, !path.isEmpty {
-          pathComponents.insert(path, at: 0)
-        }
-        // Find parent group
-        currentGroup = pbxproj.groups.first { parent in
-          parent.children.contains { $0 === g }
-        }
-      }
-
-      for component in pathComponents {
-        basePath = basePath + Path(component)
-      }
-
-      return basePath
-    }
+    let pathResolver = PathResolver(pbxproj: pbxproj, projectDir: projectPath.parent())
 
     // Check each file reference
     func checkFilesInGroup(_ group: PBXGroup, groupPath: String) {
       // First check if the group itself represents a folder that should exist
-      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
-        let pathString = absoluteGroupPath.string
-        if !fileManager.fileExists(atPath: pathString) {
-          let displayPath = group.path ?? group.name ?? "unknown"
-          invalidRefs.append(
-            (
-              group: groupPath.isEmpty ? "Root" : groupPath,
-              path: displayPath,
-              issue: "Folder not found at: \(pathString)"
-            ))
-        } else {
-          // Check if it's actually a directory
-          var isDirectory: ObjCBool = false
-          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
-          if !isDirectory.boolValue {
-            let displayPath = group.path ?? group.name ?? "unknown"
-            invalidRefs.append(
-              (
-                group: groupPath.isEmpty ? "Root" : groupPath,
-                path: displayPath,
-                issue: "Expected folder but found file at: \(pathString)"
-              ))
-          }
-        }
+      if let issue = pathResolver.validateGroup(group) {
+        let displayPath = group.path ?? group.name ?? "unknown"
+        invalidRefs.append(
+          (
+            group: groupPath.isEmpty ? "Root" : groupPath,
+            path: displayPath,
+            issue: issue
+          ))
       }
 
       // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
-          if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
-            let pathString = absolutePath.string
-
-            // Check if file exists
-            if !fileManager.fileExists(atPath: pathString) {
-              let displayPath = fileRef.path ?? fileRef.name ?? "unknown"
-              invalidRefs.append(
-                (
-                  group: groupPath,
-                  path: displayPath,
-                  issue: "File not found at: \(pathString)"
-                ))
-            } else {
-              // Check if it's a directory when it shouldn't be or vice versa
-              var isDirectory: ObjCBool = false
-              fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
-
-              let isFolder =
-                fileRef.lastKnownFileType == "folder"
-                || fileRef.lastKnownFileType == "folder.assetcatalog"
-                || fileRef.lastKnownFileType == "wrapper.framework"
-
-              if isFolder && !isDirectory.boolValue {
-                invalidRefs.append(
-                  (
-                    group: groupPath,
-                    path: fileRef.path ?? fileRef.name ?? "unknown",
-                    issue: "Expected directory but found file at: \(pathString)"
-                  ))
-              } else if !isFolder && isDirectory.boolValue && fileRef.lastKnownFileType != nil {
-                invalidRefs.append(
-                  (
-                    group: groupPath,
-                    path: fileRef.path ?? fileRef.name ?? "unknown",
-                    issue: "Expected file but found directory at: \(pathString)"
-                  ))
-              }
-            }
+          if let issue = pathResolver.validateFileReference(fileRef, in: group) {
+            let displayPath = fileRef.path ?? fileRef.name ?? "unknown"
+            invalidRefs.append(
+              (
+                group: groupPath,
+                path: displayPath,
+                issue: issue
+              ))
           }
         } else if let subgroup = child as? PBXGroup {
           let subgroupName = subgroup.name ?? subgroup.path ?? "unnamed"
@@ -2298,82 +2002,7 @@ class XcodeProjUtility {
     print("🔍 Checking for invalid file and folder references to remove...")
 
     var removedCount = 0
-    let fileManager = FileManager.default
-    let projectDir = projectPath.parent()
-
-    // Helper to resolve absolute path for a file reference
-    func resolveAbsolutePath(for fileRef: PBXFileReference, in group: PBXGroup?) -> Path? {
-      // Get the path from the file reference
-      guard let filePath = fileRef.path ?? fileRef.name else { return nil }
-
-      // Start with project directory
-      var basePath = projectDir
-
-      // If file has a source tree, handle it
-      if let sourceTree = fileRef.sourceTree {
-        switch sourceTree {
-        case .absolute:
-          return Path(filePath)
-        case .group:
-          // Need to calculate path from group hierarchy
-          if let group = group {
-            var groupPath = Path("")
-            var currentGroup: PBXGroup? = group
-            var pathComponents: [String] = []
-
-            // Build path from group hierarchy
-            while let g = currentGroup {
-              if let path = g.path, !path.isEmpty {
-                pathComponents.insert(path, at: 0)
-              }
-              // Find parent group
-              currentGroup = pbxproj.groups.first { parent in
-                parent.children.contains { $0 === g }
-              }
-            }
-
-            for component in pathComponents {
-              groupPath = groupPath + Path(component)
-            }
-            basePath = basePath + groupPath
-          }
-        case .sourceRoot:
-          // Relative to project root
-          basePath = projectDir
-        default:
-          break
-        }
-      }
-
-      return basePath + Path(filePath)
-    }
-
-    // Helper to resolve absolute path for a group (folder)
-    func resolveAbsolutePathForGroup(_ group: PBXGroup) -> Path? {
-      // Skip groups without a path (they're just organizational)
-      guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
-
-      var basePath = projectDir
-      var pathComponents: [String] = []
-      var currentGroup: PBXGroup? = group
-
-      // Build path from group hierarchy
-      while let g = currentGroup {
-        if let path = g.path, !path.isEmpty {
-          pathComponents.insert(path, at: 0)
-        }
-        // Find parent group
-        currentGroup = pbxproj.groups.first { parent in
-          parent.children.contains { $0 === g }
-        }
-      }
-
-      for component in pathComponents {
-        basePath = basePath + Path(component)
-      }
-
-      return basePath
-    }
+    let pathResolver = PathResolver(pbxproj: pbxproj, projectDir: projectPath.parent())
 
     // Collect invalid references to remove
     var refsToRemove: [PBXFileReference] = []
@@ -2381,53 +2010,19 @@ class XcodeProjUtility {
 
     func findInvalidFilesInGroup(_ group: PBXGroup) {
       // First check if the group itself represents a folder that should exist
-      if let absoluteGroupPath = resolveAbsolutePathForGroup(group) {
-        let pathString = absoluteGroupPath.string
-        if !fileManager.fileExists(atPath: pathString) {
-          groupsToRemove.append(group)
-          let displayPath = group.path ?? group.name ?? "unknown"
-          print("  ❌ Will remove folder: \(displayPath)")
-        } else {
-          // Check if it's actually a directory
-          var isDirectory: ObjCBool = false
-          fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
-          if !isDirectory.boolValue {
-            groupsToRemove.append(group)
-            let displayPath = group.path ?? group.name ?? "unknown"
-            print("  ❌ Will remove folder: \(displayPath) (not a directory)")
-          }
-        }
+      if pathResolver.validateGroup(group) != nil {
+        groupsToRemove.append(group)
+        let displayPath = group.path ?? group.name ?? "unknown"
+        print("  ❌ Will remove folder: \(displayPath)")
       }
 
       // Then check children
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
-          if let absolutePath = resolveAbsolutePath(for: fileRef, in: group) {
-            let pathString = absolutePath.string
-
-            // Check if file exists
-            if !fileManager.fileExists(atPath: pathString) {
-              refsToRemove.append(fileRef)
-              let displayPath = fileRef.path ?? fileRef.name ?? "unknown"
-              print("  ❌ Will remove: \(displayPath)")
-            } else {
-              // Check if it's a directory when it shouldn't be or vice versa
-              var isDirectory: ObjCBool = false
-              fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory)
-
-              let isFolder =
-                fileRef.lastKnownFileType == "folder"
-                || fileRef.lastKnownFileType == "folder.assetcatalog"
-                || fileRef.lastKnownFileType == "wrapper.framework"
-
-              if (isFolder && !isDirectory.boolValue)
-                || (!isFolder && isDirectory.boolValue && fileRef.lastKnownFileType != nil)
-              {
-                refsToRemove.append(fileRef)
-                let displayPath = fileRef.path ?? fileRef.name ?? "unknown"
-                print("  ❌ Will remove: \(displayPath) (type mismatch)")
-              }
-            }
+          if pathResolver.validateFileReference(fileRef, in: group) != nil {
+            refsToRemove.append(fileRef)
+            let displayPath = fileRef.path ?? fileRef.name ?? "unknown"
+            print("  ❌ Will remove: \(displayPath)")
           }
         } else if let subgroup = child as? PBXGroup {
           findInvalidFilesInGroup(subgroup)
@@ -2457,22 +2052,7 @@ class XcodeProjUtility {
       }
 
       // Remove from all build phases
-      for target in pbxproj.nativeTargets {
-        for buildPhase in target.buildPhases {
-          if let sourcesBuildPhase = buildPhase as? PBXSourcesBuildPhase {
-            sourcesBuildPhase.files?.removeAll { $0.file === fileRef }
-          }
-          if let resourcesBuildPhase = buildPhase as? PBXResourcesBuildPhase {
-            resourcesBuildPhase.files?.removeAll { $0.file === fileRef }
-          }
-          if let frameworksBuildPhase = buildPhase as? PBXFrameworksBuildPhase {
-            frameworksBuildPhase.files?.removeAll { $0.file === fileRef }
-          }
-          if let copyFilesBuildPhase = buildPhase as? PBXCopyFilesBuildPhase {
-            copyFilesBuildPhase.files?.removeAll { $0.file === fileRef }
-          }
-        }
-      }
+      buildPhaseManager.removeBuildFiles(for: fileRef)
 
       // Remove build files that reference this file
       let buildFilesToRemove = pbxproj.buildFiles.filter { $0.file === fileRef }
@@ -2643,6 +2223,18 @@ class XcodeProjUtility {
 
   // MARK: - Save
   func save() throws {
+    try profiler?.measureOperation("save") {
+      try _save()
+    } ?? _save()
+    
+    // Print performance stats if verbose
+    profiler?.printTimingReport()
+    if profiler != nil {
+      cacheManager.printCacheStatistics()
+    }
+  }
+  
+  private func _save() throws {
     // Validate before saving
     let issues = validate()
     if !issues.isEmpty {
@@ -2681,595 +2273,4 @@ class XcodeProjUtility {
       throw error
     }
   }
-}
-
-// MARK: - Command Line Interface
-struct CLI {
-  static let version = "1.0.0"
-
-  static func printUsage() {
-    print(
-      """
-      XcodeProj CLI v\(version)
-      A powerful command-line tool for Xcode project manipulation
-
-      Usage: xcodeproj-cli.swift [--project <path>] <command> [options]
-
-      Options:
-        --project <path>  Path to .xcodeproj file (default: looks for *.xcodeproj in current directory)
-        --dry-run         Preview changes without saving
-        --version         Display version information
-        --help, -h        Show this help message
-
-      FILE & FOLDER OPERATIONS:
-        
-        Understanding Groups, Folders, and References:
-        • add-group: Creates empty virtual groups for organization (yellow folder icon)
-        • add-folder: Creates a group and adds files from a filesystem folder (yellow folder icon)
-        • add-sync-folder: Creates a folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
-        • remove-group: Removes any group, folder group, or synced folder from the project
-        
-        add-file <file-path> --group <group> --targets <target1,target2>
-          Add a single file to specified group and targets
-          Short flags: -g for group, -t for targets
-          Example: add-file Sources/Model.swift --group Models --targets MyApp,MyAppTests
-          Example: add-file Helper.swift -g Utils -t MyApp
-          
-        add-files <file1:group1> [file2:group2] ... --targets <target1,target2>
-          Add multiple files at once to different groups
-          Short flag: -t for targets
-          Example: add-files User.swift:Models View.swift:Views --targets MyApp
-          Example: add-files Helper.swift:Utils Logger.swift:Debug -t MyApp,Tests
-          
-        add-folder <folder-path> --group <group> --targets <target1,target2> [--recursive]
-          Creates a group and adds all files from a filesystem folder as individual references
-          The created group will be a regular Xcode group (yellow folder icon)
-          Short flags: -g for group, -t for targets, -r for recursive
-          Parent groups are created automatically if they don't exist
-          Example: add-folder Sources/Features --group Features --targets MyApp --recursive
-          Example: add-folder UI -g Presentation -t MyApp,Tests -r
-          
-        add-sync-folder <folder-path> --group <group> --targets <target1,target2>
-          Add filesystem synchronized folder (Xcode 16+, auto-syncs with filesystem)
-          Creates PBXFileSystemSynchronizedRootGroup for automatic content syncing
-          Short flags: -g for group, -t for targets
-          Example: add-sync-folder Resources --group Assets --targets MyApp
-          Example: add-sync-folder Images -g Resources -t MyApp
-          
-        move-file <old-path> <new-path>
-          Move or rename a file within the project
-          Example: move-file OldName.swift NewName.swift
-          
-        remove-file <file-path>
-          Remove a file from the project (supports partial paths)
-          Example: remove-file ViewController.swift
-          Example: remove-file Sources/Old/Legacy.swift
-          
-        remove-group <group-name>
-          Remove any group (virtual, folder-based, or synced) and all its contents
-          Works with groups created by add-group, add-folder, or add-sync-folder
-          Example: remove-group Features/OldFeature
-          Example: remove-group Resources  (removes folder group)
-          Note: 'remove-folder' is deprecated but still works as an alias
-          
-      TARGET OPERATIONS:
-        add-target <name> --type <product-type> --bundle-id <id> [--platform iOS|macOS|tvOS|watchOS]
-          Create a new target (app, framework, etc.)
-          Product types: com.apple.product-type.application, .framework, .bundle, .unit-test-bundle
-          Example: add-target MyFramework --type com.apple.product-type.framework --bundle-id com.example.framework
-          
-        duplicate-target <source-target> <new-name> --bundle-id <id>
-          Create a copy of an existing target with a new name
-          Example: duplicate-target MyApp MyAppPro --bundle-id com.example.pro
-          
-        remove-target <target-name>
-          Remove a target and its dependencies from the project
-          Example: remove-target OldTarget
-          
-        add-dependency <target> --depends-on <target>
-          Link targets - make one target depend on another
-          Example: add-dependency MyApp --depends-on MyFramework
-          
-      DEPENDENCIES & PACKAGES:
-        add-framework <framework-name> --target <target> [--embed]
-          Add framework to target (use --embed for custom/dynamic frameworks)
-          Example: add-framework CoreData --target MyApp
-          Example: add-framework Custom.framework --target MyApp --embed
-          
-        add-swift-package <url> --requirement <req> [--target <target>]
-          Add Swift Package Manager dependency
-          Requirements: "1.0.0" (exact), "from: 1.0.0" (minimum), "branch: main"
-          Example: add-swift-package https://github.com/Alamofire/Alamofire --requirement "from: 5.0.0" --target MyApp
-          
-        remove-swift-package <url>
-          Remove a Swift Package dependency
-          Example: remove-swift-package https://github.com/Alamofire/Alamofire
-          
-        list-swift-packages
-          Show all Swift Package dependencies in the project
-          
-      BUILD CONFIGURATION:
-        add-build-phase <type> --name <name> --target <target> [--script <script>]
-          Add custom build phase to target
-          Types: run_script, copy_files
-          Example: add-build-phase run_script --name "SwiftLint" --target MyApp --script "swiftlint"
-          
-        set-build-setting <key> <value> --targets <target1,target2>
-          Set build configuration value for targets
-          Example: set-build-setting SWIFT_VERSION 5.9 --targets MyApp,MyAppTests
-          
-        get-build-settings <target> [--config <configuration>]
-          Display build settings for a target
-          Example: get-build-settings MyApp --config Debug
-          
-        list-build-settings [--target <target>] [--config <configuration>] [--show-inherited|-i] [--json|-j] [--all|-a]
-          List all build settings for a target or project
-          Without --target: shows project-level settings
-          With --target: shows target-level settings (and which override project settings)
-          --show-inherited|-i: also displays settings inherited from project level
-          --json|-j: output as JSON format
-          --all|-a: show settings for project and all targets
-          Examples: 
-            list-build-settings                                # Show project settings
-            list-build-settings --target MyApp                 # Show target settings
-            list-build-settings -t MyApp --config Debug        # Show Debug config only
-            list-build-settings -t MyApp --show-inherited      # Include inherited settings
-            list-build-settings --json                         # Output project settings as JSON
-            list-build-settings --all                          # Show all project and target settings
-            list-build-settings -a -j                          # All settings in JSON format
-          
-        list-build-configs [--target <target-name>]
-          List available build configurations (Debug, Release, etc.)
-          
-      PROJECT STRUCTURE:
-        add-group <group1/subgroup1> <group2/subgroup2> ...
-          Add virtual group hierarchy in project navigator (no filesystem folders created)
-          Use this to organize files in Xcode without moving them on disk
-          Example: add-group Features/Login Features/Settings Utils/Extensions
-          Note: 'create-groups' is still supported as an alias for backward compatibility
-          
-        update-paths <old-prefix> <new-prefix>
-          Batch update file paths with new prefix
-          Example: update-paths "Old/Path" "New/Path"
-          
-        update-paths-map <old1:new1> <old2:new2> ...
-          Update specific file paths individually
-          Example: update-paths-map OldFile.swift:NewFile.swift Legacy.m:Updated.m
-          
-      INSPECTION & VALIDATION:
-        list-targets
-          Show all targets in the project with their types
-          
-        list-files [group-name]
-          Show files in entire project or specific group (flat list)
-          Example: list-files
-          Example: list-files Sources/Models
-          Note: Consider using 'list-tree' for better visualization
-          
-        list-groups
-          Show group hierarchy in tree format (no files)
-          Note: Consider using 'list-tree' to also see files
-          
-        list-tree
-          Show complete project structure as a tree (RECOMMENDED)
-          Virtual groups shown as names only, files/folders show paths in parentheses
-          
-        list-invalid-references
-          Find all broken file references (files that don't exist)
-          
-        remove-invalid-references
-          Clean up all broken file references automatically
-          
-        validate
-          Check project integrity and report any issues
-          
-      COMMON WORKFLOWS:
-
-        # Adding files to your project:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-file NewFeature.swift --group Features --targets MyApp
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-folder Sources/Features --group Features --targets MyApp --recursive
-        
-        # Cleaning up the project:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj list-invalid-references
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-invalid-references
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj validate
-        
-        # Managing dependencies:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-swift-package https://github.com/Alamofire/Alamofire --requirement "from: 5.0.0" --target MyApp
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-framework CoreML --target MyApp
-        
-        # Working with targets:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj list-targets
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj duplicate-target MyApp MyAppPro --bundle-id com.example.pro
-        
-        # Reorganizing files:
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj add-group Features/Login Features/Profile Utils
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj move-file OldName.swift NewName.swift
-        ./xcodeproj-cli.swift --project MyApp.xcodeproj remove-group OldFeatures
-      """)
-  }
-
-  static func run() throws {
-    let args = Array(CommandLine.arguments.dropFirst())
-
-    // Handle version flag
-    if args.contains("--version") || args.contains("-v") {
-      print("XcodeProj CLI v\(version)")
-      exit(0)
-    }
-
-    // Handle help flag
-    if args.contains("--help") || args.contains("-h") || args.isEmpty {
-      printUsage()
-      exit(0)
-    }
-
-    // Extract flags
-    var projectPath: String? = nil
-    var dryRun = false
-    var filteredArgs = args
-
-    // Process --project flag
-    if let projectIndex = filteredArgs.firstIndex(of: "--project")
-      ?? filteredArgs.firstIndex(of: "-p")
-    {
-      if projectIndex + 1 < filteredArgs.count {
-        projectPath = filteredArgs[projectIndex + 1]
-        filteredArgs.remove(at: projectIndex + 1)
-        filteredArgs.remove(at: projectIndex)
-      } else {
-        throw ProjectError.invalidArguments("--project requires a path")
-      }
-    }
-
-    // If no project specified, look for .xcodeproj in current directory
-    if projectPath == nil {
-      let fileManager = FileManager.default
-      let currentPath = fileManager.currentDirectoryPath
-      let contents = try fileManager.contentsOfDirectory(atPath: currentPath)
-      let xcodeprojFiles = contents.filter { $0.hasSuffix(".xcodeproj") }
-
-      if xcodeprojFiles.isEmpty {
-        throw ProjectError.invalidArguments(
-          "No .xcodeproj file found in current directory. Use --project to specify the path.")
-      } else if xcodeprojFiles.count > 1 {
-        throw ProjectError.invalidArguments(
-          "Multiple .xcodeproj files found: \(xcodeprojFiles.joined(separator: ", ")). Use --project to specify which one."
-        )
-      } else {
-        projectPath = xcodeprojFiles[0]
-      }
-    }
-
-    // Process --dry-run flag
-    if let dryRunIndex = filteredArgs.firstIndex(of: "--dry-run") {
-      dryRun = true
-      filteredArgs.remove(at: dryRunIndex)
-      print("🔍 DRY RUN MODE - No changes will be saved")
-    }
-
-    guard let command = filteredArgs.first else {
-      printUsage()
-      exit(0)
-    }
-
-    let utility = try XcodeProjUtility(path: projectPath!)
-    let remainingArgs = Array(filteredArgs.dropFirst())
-
-    // Parse the remaining arguments using the new parser
-    let parsedArgs = parseArguments(remainingArgs)
-
-    switch command {
-    case "add-file":
-      guard let filePath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-file requires: <file-path> --group <group> --targets <target1,target2>")
-      }
-      let group = try parsedArgs.requireFlag(
-        "--group", "-g", error: "add-file requires --group or -g flag")
-      let targetsStr = try parsedArgs.requireFlag(
-        "--targets", "-t", error: "add-file requires --targets or -t flag")
-      let targets = targetsStr.split(separator: ",").map(String.init)
-      try utility.addFile(path: filePath, to: group, targets: targets)
-
-    case "add-folder":
-      guard let folderPath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-folder requires: <folder-path> --group <group> --targets <target1,target2> [--recursive]"
-        )
-      }
-      let group = try parsedArgs.requireFlag(
-        "--group", "-g", error: "add-folder requires --group or -g flag")
-      let targetsStr = try parsedArgs.requireFlag(
-        "--targets", "-t", error: "add-folder requires --targets or -t flag")
-      let targets = targetsStr.split(separator: ",").map(String.init)
-      let recursive = parsedArgs.hasFlag("--recursive", "-r")
-      try utility.addFolder(
-        folderPath: folderPath, to: group, targets: targets, recursive: recursive)
-
-    case "add-sync-folder":
-      guard let folderPath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-sync-folder requires: <folder-path> --group <group> --targets <target1,target2>")
-      }
-      let group = try parsedArgs.requireFlag(
-        "--group", "-g", error: "add-sync-folder requires --group or -g flag")
-      let targetsStr = try parsedArgs.requireFlag(
-        "--targets", "-t", error: "add-sync-folder requires --targets or -t flag")
-      let targets = targetsStr.split(separator: ",").map(String.init)
-      try utility.addSynchronizedFolder(folderPath: folderPath, to: group, targets: targets)
-
-    case "add-files":
-      // Parse file:group pairs from positional arguments
-      var files: [(String, String)] = []
-      for arg in parsedArgs.positional {
-        let parts = arg.split(separator: ":")
-        if parts.count == 2 {
-          files.append((String(parts[0]), String(parts[1])))
-        }
-      }
-
-      guard !files.isEmpty else {
-        throw ProjectError.invalidArguments(
-          "add-files requires: <file1:group1> [file2:group2] ... --targets <target1,target2>")
-      }
-
-      let targetsStr = try parsedArgs.requireFlag(
-        "--targets", "-t", error: "add-files requires --targets or -t flag")
-      let targets = targetsStr.split(separator: ",").map(String.init)
-
-      try utility.addFiles(files, to: targets)
-
-    case "update-paths":
-      guard parsedArgs.positional.count >= 2 else {
-        throw ProjectError.invalidArguments("update-paths requires: <old-prefix> <new-prefix>")
-      }
-      utility.updatePathsWithPrefix(from: parsedArgs.positional[0], to: parsedArgs.positional[1])
-
-    case "update-paths-map":
-      var mappings: [String: String] = [:]
-      for arg in parsedArgs.positional {
-        let parts = arg.split(separator: ":")
-        if parts.count == 2 {
-          mappings[String(parts[0])] = String(parts[1])
-        }
-      }
-      guard !mappings.isEmpty else {
-        throw ProjectError.invalidArguments(
-          "update-paths-map requires: <old1:new1> [old2:new2] ...")
-      }
-      utility.updateFilePaths(mappings)
-
-    case "move-file":
-      guard parsedArgs.positional.count >= 2 else {
-        throw ProjectError.invalidArguments("move-file requires: <old-path> <new-path>")
-      }
-      try utility.moveFile(from: parsedArgs.positional[0], to: parsedArgs.positional[1])
-
-    case "remove-file":
-      guard let filePath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-file requires: <file-path>")
-      }
-      try utility.removeFile(filePath)
-
-    case "remove-group", "remove-folder":  // remove-folder kept for backward compatibility
-      guard let groupPath = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-group requires: <group-path>")
-      }
-      try utility.removeGroup(groupPath)
-
-    case "add-target":
-      guard let targetName = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-target requires: <name> --type <product-type> --bundle-id <bundle-id> [--platform <platform>]"
-        )
-      }
-      let productType = try parsedArgs.requireFlag(
-        "--type", "-T", error: "add-target requires --type or -T flag")
-      let bundleId = try parsedArgs.requireFlag(
-        "--bundle-id", "-b", error: "add-target requires --bundle-id or -b flag")
-      let platform = parsedArgs.getFlag("--platform", "-p") ?? "iOS"
-      try utility.addTarget(
-        name: targetName, productType: productType, bundleId: bundleId, platform: platform)
-
-    case "duplicate-target":
-      guard parsedArgs.positional.count >= 2 else {
-        throw ProjectError.invalidArguments(
-          "duplicate-target requires: <source-target> <new-name> [--bundle-id <bundle-id>]")
-      }
-      let bundleId = parsedArgs.getFlag("--bundle-id", "-b")
-      try utility.duplicateTarget(
-        source: parsedArgs.positional[0], newName: parsedArgs.positional[1], newBundleId: bundleId)
-
-    case "remove-target":
-      guard let targetName = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-target requires: <target-name>")
-      }
-      try utility.removeTarget(name: targetName)
-
-    case "add-dependency":
-      guard let target = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-dependency requires: <target> --depends-on <target>")
-      }
-      let dependsOn = try parsedArgs.requireFlag(
-        "--depends-on", error: "add-dependency requires --depends-on flag")
-      try utility.addDependency(to: target, dependsOn: dependsOn)
-
-    case "add-framework":
-      guard let frameworkName = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-framework requires: <framework-name> --target <target> [--embed]")
-      }
-      let targetName = try parsedArgs.requireFlag(
-        "--target", "-t", error: "add-framework requires --target or -t flag")
-      let embed = parsedArgs.hasFlag("--embed", "-e")
-      try utility.addFramework(name: frameworkName, to: targetName, embed: embed)
-
-    case "add-swift-package":
-      guard let url = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "add-swift-package requires: <url> --version <requirement> [--target <target>]")
-      }
-      let requirement = try parsedArgs.requireFlag(
-        "--version", "-v", error: "add-swift-package requires --version or -v flag")
-      let targetName = parsedArgs.getFlag("--target", "-t")
-      try utility.addSwiftPackage(url: url, requirement: requirement, to: targetName)
-
-    case "remove-swift-package":
-      guard let url = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments("remove-swift-package requires: <url>")
-      }
-      try utility.removeSwiftPackage(url: url)
-
-    case "list-swift-packages":
-      utility.listSwiftPackages()
-      exit(0)
-
-    case "add-build-phase":
-      guard parsedArgs.positional.count >= 2 else {
-        throw ProjectError.invalidArguments(
-          "add-build-phase requires: <type> <name> --target <target> [--script <script>]")
-      }
-      let type = parsedArgs.positional[0]
-      let name = parsedArgs.positional[1]
-      let targetName = try parsedArgs.requireFlag(
-        "--target", "-t", error: "add-build-phase requires --target or -t flag")
-      let script = parsedArgs.getFlag("--script", "-s")
-      try utility.addBuildPhase(type: type, name: name, to: targetName, script: script)
-
-    case "get-build-settings":
-      guard let targetName = parsedArgs.positional.first else {
-        throw ProjectError.invalidArguments(
-          "get-build-settings requires: <target> [--config <configuration>]")
-      }
-      let config = parsedArgs.getFlag("--config", "-c")
-      let settings = utility.getBuildSettings(for: targetName, configuration: config)
-      for (configName, configSettings) in settings {
-        print("\n🔧 \(configName):")
-        for (key, value) in configSettings {
-          print("  \(key) = \(value)")
-        }
-      }
-      exit(0)
-
-    case "list-build-settings":
-      // Can be called without --target for project settings, or with --target for target settings
-      let targetName = parsedArgs.getFlag("--target", "-t")
-      let config = parsedArgs.getFlag("--config", "-c")
-      let showInherited = parsedArgs.hasFlag("--show-inherited", "-i")
-      let outputJSON = parsedArgs.hasFlag("--json", "-j")
-      let showAll = parsedArgs.hasFlag("--all", "-a")
-      utility.listBuildSettings(
-        targetName: targetName, configuration: config, showInherited: showInherited,
-        outputJSON: outputJSON, showAll: showAll)
-      exit(0)
-
-    case "list-build-configs":
-      let targetName = parsedArgs.getFlag("--target", "-t")
-      utility.listBuildConfigurations(for: targetName)
-      exit(0)
-
-    case "list-groups":
-      utility.listGroupsTree()
-      exit(0)
-
-    case "add-group", "create-groups":  // create-groups kept for backward compatibility
-      guard !parsedArgs.positional.isEmpty else {
-        throw ProjectError.invalidArguments("add-group requires: <group1> [group2] ...")
-      }
-      for groupPath in parsedArgs.positional {
-        _ = utility.ensureGroupHierarchy(groupPath)
-      }
-
-    case "set-build-setting":
-      guard parsedArgs.positional.count >= 2 else {
-        throw ProjectError.invalidArguments(
-          "set-build-setting requires: <key> <value> --targets <target1,target2>")
-      }
-      let key = parsedArgs.positional[0]
-      let value = parsedArgs.positional[1]
-      let targetsStr = try parsedArgs.requireFlag(
-        "--targets", "-t", error: "set-build-setting requires --targets or -t flag")
-      let targets = targetsStr.split(separator: ",").map(String.init)
-
-      utility.updateBuildSettings(targets: targets) { settings in
-        settings[key] = .string(value)
-      }
-
-    case "validate":
-      let issues = utility.validate()
-      if issues.isEmpty {
-        print("✅ No validation issues found")
-      } else {
-        print("❌ Validation issues:")
-        issues.forEach { print("  - \($0)") }
-      }
-      exit(issues.isEmpty ? 0 : 1)
-
-    case "list-invalid-references":
-      utility.listInvalidReferences()
-      exit(0)
-
-    case "remove-invalid-references":
-      utility.removeInvalidReferences()
-
-    case "list-targets":
-      print("📱 Targets in project:")
-      for target in utility.pbxproj.nativeTargets {
-        print("  - \(target.name) (\(target.productType?.rawValue ?? "unknown"))")
-      }
-      exit(0)
-
-    case "list-files":
-      let groupName = parsedArgs.positional.first
-      if let name = groupName,
-        let group = findGroup(named: name, in: utility.pbxproj.groups)
-      {
-        print("📄 Files in \(name):")
-        listFilesInGroup(group, indent: "  ")
-      } else {
-        print("📄 All files in project:")
-        for fileRef in utility.pbxproj.fileReferences {
-          print("  - \(fileRef.path ?? fileRef.name ?? "unknown")")
-        }
-      }
-      exit(0)
-
-    case "list-tree":
-      utility.listProjectTree()
-      exit(0)
-
-    default:
-      print("❌ Unknown command: \(command)")
-      printUsage()
-      exit(1)
-    }
-
-    if !dryRun {
-      try utility.save()
-    } else {
-      print("🔍 DRY RUN - Changes not saved")
-    }
-  }
-
-  static func listFilesInGroup(_ group: PBXGroup, indent: String = "") {
-    for child in group.children {
-      if let fileRef = child as? PBXFileReference {
-        print("\(indent)- \(fileRef.path ?? fileRef.name ?? "unknown")")
-      } else if let subgroup = child as? PBXGroup {
-        print("\(indent)📁 \(subgroup.name ?? subgroup.path ?? "unknown")/")
-        listFilesInGroup(subgroup, indent: indent + "  ")
-      }
-    }
-  }
-
-}
-
-// MARK: - Main
-do {
-  try CLI.run()
-} catch {
-  print("❌ Error: \(error)")
-  exit(1)
 }

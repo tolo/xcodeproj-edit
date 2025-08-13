@@ -50,10 +50,35 @@ protocol TestSuite {
   static func run() -> TestResults
 }
 
+// Load TestHelper for binary discovery
+#if canImport(TestHelper)
+import TestHelper
+#else
+// Inline helper when import not available
+struct TestHelper {
+  static func getToolPath() -> String { "../.build/release/xcodeproj-cli" }
+  static func shell(_ command: String) -> (output: String, exitCode: Int32) {
+    let task = Process()
+    let pipe = Pipe()
+    
+    task.standardOutput = pipe
+    task.standardError = pipe
+    task.arguments = ["-c", command]
+    task.launchPath = "/bin/bash"
+    task.launch()
+    task.waitUntilExit()
+    
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let output = String(data: data, encoding: .utf8) ?? ""
+    
+    return (output, task.terminationStatus)
+  }
+}
+#endif
+
 // Test runner
 @main
 struct TestRunner {
-  static let toolPath = "../src/xcodeproj-cli.swift"
   static let testProjectPath = "TestData/TestProject.xcodeproj"
 
   static func main() {
@@ -99,6 +124,27 @@ struct TestRunner {
       print("\n\(Colors.blue)Running additional edge case tests...\(Colors.reset)\n")
       results = AdditionalTestSuite.run()
 
+    case "packages", "package", "--packages", "-p":
+      print("\n\(Colors.blue)Running Swift Package Manager tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = PackageTestSuite.run()
+      restoreProject()
+
+    case "build", "build-config", "--build", "-b":
+      print("\n\(Colors.blue)Running Build Configuration tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = BuildConfigTestSuite.run()
+      restoreProject()
+
+    case "integration", "--integration", "-i":
+      print("\n\(Colors.blue)Running Integration tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = IntegrationTestSuite.run()
+      restoreProject()
+
     case "all", "--all", "-a":
       print("\n\(Colors.blue)Running all tests...\(Colors.reset)\n")
 
@@ -122,6 +168,33 @@ struct TestRunner {
       restoreProject()
       results.passed += fullResults.passed
       results.failed += fullResults.failed
+
+      print("\n📋 Swift Package Manager Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let packageResults = PackageTestSuite.run()
+      restoreProject()
+      results.passed += packageResults.passed
+      results.failed += packageResults.failed
+
+      print("\n📋 Build Configuration Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let buildResults = BuildConfigTestSuite.run()
+      restoreProject()
+      results.passed += buildResults.passed
+      results.failed += buildResults.failed
+
+      print("\n📋 Integration Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let integrationResults = IntegrationTestSuite.run()
+      restoreProject()
+      results.passed += integrationResults.passed
+      results.failed += integrationResults.failed
 
       print("\n📋 Additional Edge Case Tests")
       print(String(repeating: "-", count: 30))
@@ -150,18 +223,23 @@ struct TestRunner {
       Usage: ./TestRunner.swift [command]
 
       Commands:
-        validation, -v    Run validation tests (read-only)
-        core, -c         Run core operations tests (modifies test project)
-        security, -s     Run security tests
-        additional, -e    Run additional edge case tests
-        all, -a          Run all test suites (complete coverage)
-        help, -h         Show this help message
+        validation, -v       Run validation tests (read-only)
+        core, -c            Run core operations tests (modifies test project)
+        security, -s        Run security tests
+        packages, -p        Run Swift Package Manager tests
+        build, -b           Run Build Configuration tests
+        integration, -i     Run Integration tests (complete workflows)
+        additional, -e      Run additional edge case tests
+        all, -a            Run all test suites (complete coverage)
+        help, -h           Show this help message
 
       If no command is provided, an interactive menu will be shown.
 
       Examples:
         ./TestRunner.swift validation
-        ./TestRunner.swift core
+        ./TestRunner.swift packages
+        ./TestRunner.swift build
+        ./TestRunner.swift integration
         ./TestRunner.swift -a
       """)
   }
@@ -171,10 +249,13 @@ struct TestRunner {
     print("  1. Quick validation tests (read-only, basic checks)")
     print("  2. Core operations tests (file/folder/target/build operations)")
     print("  3. Security tests (input validation & safety)")
-    print("  4. Additional edge case tests (argument parsing, packages, etc.)")
-    print("  5. Run ALL test suites (complete test coverage)")
-    print("  6. Exit")
-    print("\nEnter choice (1-6): ", terminator: "")
+    print("  4. Swift Package Manager tests (add/remove/list packages)")
+    print("  5. Build Configuration tests (set/get/list build settings)")
+    print("  6. Integration tests (complete workflows)")
+    print("  7. Additional edge case tests (argument parsing, etc.)")
+    print("  8. Run ALL test suites (complete test coverage)")
+    print("  9. Exit")
+    print("\nEnter choice (1-9): ", terminator: "")
 
     guard let input = readLine()?.trimmingCharacters(in: .whitespaces) else {
       print("\(Colors.red)Invalid input\(Colors.reset)")
@@ -200,10 +281,31 @@ struct TestRunner {
       results = SecurityTestSuite.run()
 
     case "4":
+      print("\n\(Colors.blue)Running Swift Package Manager tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = PackageTestSuite.run()
+      restoreProject()
+
+    case "5":
+      print("\n\(Colors.blue)Running Build Configuration tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = BuildConfigTestSuite.run()
+      restoreProject()
+
+    case "6":
+      print("\n\(Colors.blue)Running Integration tests...\(Colors.reset)\n")
+      restoreProject()  // Start from clean state
+      backupProject()
+      results = IntegrationTestSuite.run()
+      restoreProject()
+
+    case "7":
       print("\n\(Colors.blue)Running additional edge case tests...\(Colors.reset)\n")
       results = AdditionalTestSuite.run()
 
-    case "5":
+    case "8":
       print("\n\(Colors.blue)Running all tests...\(Colors.reset)\n")
 
       print("\n📋 Validation Tests")
@@ -227,13 +329,40 @@ struct TestRunner {
       results.passed += fullResults.passed
       results.failed += fullResults.failed
 
+      print("\n📋 Swift Package Manager Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let packageResults = PackageTestSuite.run()
+      restoreProject()
+      results.passed += packageResults.passed
+      results.failed += packageResults.failed
+
+      print("\n📋 Build Configuration Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let buildResults = BuildConfigTestSuite.run()
+      restoreProject()
+      results.passed += buildResults.passed
+      results.failed += buildResults.failed
+
+      print("\n📋 Integration Tests")
+      print(String(repeating: "-", count: 30))
+      restoreProject()  // Start from clean state
+      backupProject()
+      let integrationResults = IntegrationTestSuite.run()
+      restoreProject()
+      results.passed += integrationResults.passed
+      results.failed += integrationResults.failed
+
       print("\n📋 Additional Edge Case Tests")
       print(String(repeating: "-", count: 30))
       let additionalResults = AdditionalTestSuite.run()
       results.passed += additionalResults.passed
       results.failed += additionalResults.failed
 
-    case "6":
+    case "9":
       print("Goodbye! 👋")
       exit(0)
 
@@ -247,7 +376,7 @@ struct TestRunner {
   }
 
   static func createTestProject() {
-    let result = shell("./create_test_project.swift")
+    let result = TestHelper.shell("./create_test_project.swift")
     if result.exitCode != 0 {
       print("\(Colors.red)Failed to create test project\(Colors.reset)")
       print(result.output)
@@ -271,90 +400,7 @@ struct TestRunner {
     }
   }
 
-  static func shell(_ command: String) -> (output: String, exitCode: Int32) {
-    let task = Process()
-    let pipe = Pipe()
 
-    task.standardOutput = pipe
-    task.standardError = pipe
-    task.arguments = ["-c", command]
-    task.launchPath = "/bin/bash"
-    task.launch()
-    task.waitUntilExit()
-
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    let output = String(data: data, encoding: .utf8) ?? ""
-
-    return (output, task.terminationStatus)
-  }
-
-  static func shellRealtime(_ command: String) -> (passed: Int, failed: Int, exitCode: Int32) {
-    let task = Process()
-    let pipe = Pipe()
-
-    var passed = 0
-    var failed = 0
-    var buffer = ""
-
-    task.standardOutput = pipe
-    task.standardError = pipe
-    task.arguments = ["-c", command]
-    task.launchPath = "/bin/bash"
-
-    // Read output in real-time
-    let outHandle = pipe.fileHandleForReading
-    outHandle.readabilityHandler = { handle in
-      let data = handle.availableData
-      if data.count > 0 {
-        if let str = String(data: data, encoding: .utf8) {
-          // Add to buffer
-          buffer += str
-
-          // Process complete lines
-          while let newlineRange = buffer.range(of: "\n") {
-            let line = String(buffer[..<newlineRange.lowerBound])
-            buffer.removeSubrange(..<newlineRange.upperBound)
-
-            // Skip build output and warnings
-            let skipPatterns = [
-              "Building for debugging", "[0/", "warning:", "swift-sh", "Fetching", "Planning build",
-            ]
-            let shouldSkip = skipPatterns.contains { line.contains($0) }
-
-            if !shouldSkip && !line.isEmpty {
-              // Count test results - look for lines with both Testing: and result
-              if line.contains("Testing:") {
-                if line.contains("✅") {
-                  passed += 1
-                } else if line.contains("❌") {
-                  failed += 1
-                }
-              }
-
-              // Print the line as-is (it already has formatting)
-              print(line)
-            }
-          }
-        }
-      }
-    }
-
-    task.launch()
-    task.waitUntilExit()
-    outHandle.readabilityHandler = nil
-
-    // Process any remaining buffer
-    if !buffer.isEmpty && buffer.contains("Testing:") {
-      if buffer.contains("✅") {
-        passed += 1
-      } else if buffer.contains("❌") {
-        failed += 1
-      }
-      print(buffer)
-    }
-
-    return (passed, failed, task.terminationStatus)
-  }
 }
 
 // Validation Tests (read-only)
@@ -364,7 +410,7 @@ struct ValidationTests: TestSuite {
 
     // Test help command
     runTest("Help command", &results) {
-      let result = TestRunner.shell("\(TestRunner.toolPath) --help")
+      let result = TestHelper.shell("\(TestHelper.getToolPath()) --help")
       return result.output.contains("Usage:") && result.exitCode == 0
     }
 
@@ -374,24 +420,24 @@ struct ValidationTests: TestSuite {
     // Check if test project exists
     if FileManager.default.fileExists(atPath: testProject) {
       runTest("List targets", &results) {
-        let result = TestRunner.shell(
-          "\(TestRunner.toolPath) --project \(testProject) list-targets")
+        let result = TestHelper.shell(
+          "\(TestHelper.getToolPath()) --project \(testProject) list-targets")
         return result.exitCode == 0
       }
 
       runTest("List groups", &results) {
-        let result = TestRunner.shell("\(TestRunner.toolPath) --project \(testProject) list-groups")
+        let result = TestHelper.shell("\(TestHelper.getToolPath()) --project \(testProject) list-groups")
         return result.exitCode == 0
       }
 
       runTest("List build configs", &results) {
-        let result = TestRunner.shell(
-          "\(TestRunner.toolPath) --project \(testProject) list-build-configs")
+        let result = TestHelper.shell(
+          "\(TestHelper.getToolPath()) --project \(testProject) list-build-configs")
         return result.exitCode == 0
       }
 
       runTest("Validate project", &results) {
-        let result = TestRunner.shell("\(TestRunner.toolPath) --project \(testProject) validate")
+        let result = TestHelper.shell("\(TestHelper.getToolPath()) --project \(testProject) validate")
         return result.exitCode == 0 || result.output.contains("issues found")
       }
     } else {
@@ -401,18 +447,18 @@ struct ValidationTests: TestSuite {
 
     // Test error handling
     runTest("Invalid arguments handling", &results) {
-      let result = TestRunner.shell("\(TestRunner.toolPath) add-file 2>&1")
+      let result = TestHelper.shell("\(TestHelper.getToolPath()) add-file 2>&1")
       return result.output.contains("Error:") && result.exitCode == 1
     }
 
     runTest("Missing parameters handling", &results) {
-      let result = TestRunner.shell("\(TestRunner.toolPath) add-target 2>&1")
+      let result = TestHelper.shell("\(TestHelper.getToolPath()) add-target 2>&1")
       return result.output.contains("Error:") && result.exitCode == 1
     }
 
     // Test dry-run mode
     runTest("Dry-run flag", &results) {
-      let result = TestRunner.shell("\(TestRunner.toolPath) --dry-run --help")
+      let result = TestHelper.shell("\(TestHelper.getToolPath()) --dry-run --help")
       return result.exitCode == 0
     }
 
@@ -423,12 +469,35 @@ struct ValidationTests: TestSuite {
 // Core Operations Test Suite (from TestSuite.swift)
 struct FullTestSuite: TestSuite {
   static func run() -> TestResults {
-    // Run the test suite with real-time output
-    let (passed, failed, exitCode) = TestRunner.shellRealtime("./TestSuite.swift")
-
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./TestSuite.swift")
+    
     var results = TestResults()
-    results.passed = passed
-    results.failed = failed
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        // Extract passed count from "Passed: X/Y" format
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        // Extract failed count from "Failed: X/Y" format
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
 
     return results
   }
@@ -437,12 +506,33 @@ struct FullTestSuite: TestSuite {
 // Security Test Suite (from SecurityTests.swift)
 struct SecurityTestSuite: TestSuite {
   static func run() -> TestResults {
-    // Run the test suite with real-time output
-    let (passed, failed, exitCode) = TestRunner.shellRealtime("./SecurityTests.swift")
-
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./SecurityTests.swift")
+    
     var results = TestResults()
-    results.passed = passed
-    results.failed = failed
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
 
     return results
   }
@@ -451,12 +541,138 @@ struct SecurityTestSuite: TestSuite {
 // Additional Test Suite (from AdditionalTests.swift)
 struct AdditionalTestSuite: TestSuite {
   static func run() -> TestResults {
-    // Run the test suite with real-time output
-    let (passed, failed, exitCode) = TestRunner.shellRealtime("./AdditionalTests.swift")
-
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./AdditionalTests.swift")
+    
     var results = TestResults()
-    results.passed = passed
-    results.failed = failed
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
+
+    return results
+  }
+}
+
+// Package Test Suite (from PackageTests.swift)
+struct PackageTestSuite: TestSuite {
+  static func run() -> TestResults {
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./PackageTests.swift")
+    
+    var results = TestResults()
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
+
+    return results
+  }
+}
+
+// Build Config Test Suite (from BuildConfigTests.swift)
+struct BuildConfigTestSuite: TestSuite {
+  static func run() -> TestResults {
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./BuildConfigTests.swift")
+    
+    var results = TestResults()
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
+
+    return results
+  }
+}
+
+// Integration Test Suite (from IntegrationTests.swift)
+struct IntegrationTestSuite: TestSuite {
+  static func run() -> TestResults {
+    // Run the test suite and parse results
+    let result = TestHelper.shell("./IntegrationTests.swift")
+    
+    var results = TestResults()
+    let lines = result.output.split(separator: "\n")
+    
+    // Parse the output for passed/failed counts
+    for line in lines {
+      let lineStr = String(line)
+      if lineStr.contains("Passed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Passed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let passedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.passed = Int(passedStr) ?? 0
+        }
+      }
+      if lineStr.contains("Failed:") && lineStr.contains("/") {
+        if let match = lineStr.range(of: "Failed: "), 
+           let slashRange = lineStr[match.upperBound...].range(of: "/") {
+          let failedStr = String(lineStr[match.upperBound..<slashRange.lowerBound])
+          results.failed = Int(failedStr) ?? 0
+        }
+      }
+    }
+    
+    // Print the output for real-time feedback
+    print(result.output)
 
     return results
   }
