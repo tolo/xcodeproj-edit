@@ -1216,7 +1216,7 @@ class XcodeProjUtility {
       allSettingKeys.formUnion(config.buildSettings.keys)
     }
 
-    let activeConfigs = configuration != nil ? [configuration!] : configNames
+    let activeConfigs = configuration.map { [$0] } ?? configNames
     return (settingsData, allSettingKeys, activeConfigs)
   }
   
@@ -1260,7 +1260,7 @@ class XcodeProjUtility {
       }
     }
 
-    let activeConfigs = configuration != nil ? [configuration!] : configNames
+    let activeConfigs = configuration.map { [$0] } ?? configNames
     return (settingsData, projectSettingsData, allSettingKeys, activeConfigs)
   }
   
@@ -1789,7 +1789,7 @@ class XcodeProjUtility {
     }
 
     // Filter configs if specific configuration requested
-    let activeConfigs = configuration != nil ? [configuration!] : configNames
+    let activeConfigs = configuration.map { [$0] } ?? configNames
 
     if allSettingKeys.isEmpty {
       print("  (No explicit settings defined)")

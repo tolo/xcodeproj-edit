@@ -12,6 +12,11 @@ struct PathUtils {
   
   /// Sanitize and validate a file path for security
   static func sanitizePath(_ path: String) -> String? {
+    // Limit path length to prevent resource exhaustion
+    guard path.count <= 1024 else {
+      return nil // Path too long
+    }
+    
     // Check for null bytes
     if path.contains("\0") {
       return nil

@@ -17,6 +17,12 @@ struct ArgumentParser {
 
     while i < args.count {
       let arg = args[i]
+      
+      // Validate argument length to prevent resource exhaustion
+      guard arg.count <= 512 else {
+        print("❌ Error: Argument too long (maximum 512 characters)")
+        exit(1)
+      }
 
       if arg.hasPrefix("--") || arg.hasPrefix("-") {
         let flagName = arg
