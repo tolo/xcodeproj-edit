@@ -20,12 +20,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Test Suites**: Security-focused tests, integration tests, and performance validation
 - **Core Services**: Transaction management, project validation, cache management, and build phase management
 - **Performance Profiling**: Built-in performance monitoring with timing reports and memory usage tracking
+- **Scheme Management**: Complete suite of 8 commands for creating, configuring, and managing Xcode schemes
+- **Workspace Support**: Full workspace management with 6 new commands for multi-project setups
+- **Cross-Project Dependencies**: Support for linking targets across different projects
+- **Build Configuration Management**: Advanced .xcconfig file support with diff, copy, and export features
+- **Localization Support**: Manage project localizations and variant groups for internationalization
 - Swift Package Manager configuration (`Package.swift`)
 - Universal binary build support (Intel + Apple Silicon)
 - GitHub Actions workflow for automated releases
 - Pre-built binary distribution via GitHub Releases
 - Homebrew tap support for easy installation
 - ARCHITECTURE.md documentation for developers
+
+### New Commands (35+ commands added)
+#### Scheme Management
+- `create-scheme` - Create new schemes for targets
+- `duplicate-scheme` - Clone existing schemes
+- `remove-scheme` - Delete schemes
+- `list-schemes` - List all project schemes
+- `set-scheme-config` - Configure scheme build settings
+- `add-scheme-target` - Add targets to scheme build actions
+- `enable-test-coverage` - Enable code coverage in schemes
+- `set-test-parallel` - Configure test parallelization
+
+#### Workspace Management
+- `create-workspace` - Create new Xcode workspaces
+- `add-project-to-workspace` - Add projects to workspaces
+- `remove-project-from-workspace` - Remove projects from workspaces
+- `list-workspace-projects` - List all workspace projects
+- `add-project-reference` - Add external project references
+- `add-cross-project-dependency` - Create cross-project target dependencies
 
 ### Changed
 - **Architecture Refactoring**: Migrated from single-file script to modular, service-oriented architecture

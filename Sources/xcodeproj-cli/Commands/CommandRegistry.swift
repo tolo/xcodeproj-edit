@@ -112,6 +112,50 @@ struct CommandRegistry {
     case UpdatePathsMapCommand.commandName:
       try UpdatePathsMapCommand.execute(with: arguments, utility: utility)
       
+    // Scheme Commands
+    case "create-scheme":
+      try CreateSchemeCommand.execute(with: arguments, utility: utility)
+      
+    case "duplicate-scheme":
+      try DuplicateSchemeCommand.execute(with: arguments, utility: utility)
+      
+    case "remove-scheme":
+      try RemoveSchemeCommand.execute(with: arguments, utility: utility)
+      
+    case "list-schemes":
+      try ListSchemesCommand.execute(with: arguments, utility: utility)
+      
+    case "set-scheme-config":
+      try SetSchemeConfigCommand.execute(with: arguments, utility: utility)
+      
+    case "add-scheme-target":
+      try AddSchemeTargetCommand.execute(with: arguments, utility: utility)
+      
+    case "enable-test-coverage":
+      try EnableTestCoverageCommand.execute(with: arguments, utility: utility)
+      
+    case "set-test-parallel":
+      try SetTestParallelCommand.execute(with: arguments, utility: utility)
+      
+    // Workspace Commands
+    case "create-workspace":
+      try CreateWorkspaceCommand.execute(with: arguments, utility: utility)
+      
+    case "add-project-to-workspace":
+      try AddProjectToWorkspaceCommand.execute(with: arguments, utility: utility)
+      
+    case "remove-project-from-workspace":
+      try RemoveProjectFromWorkspaceCommand.execute(with: arguments, utility: utility)
+      
+    case "list-workspace-projects":
+      try ListWorkspaceProjectsCommand.execute(with: arguments, utility: utility)
+      
+    case "add-project-reference":
+      try AddProjectReferenceCommand.execute(with: arguments, utility: utility)
+      
+    case "add-cross-project-dependency":
+      try AddCrossProjectDependencyCommand.execute(with: arguments, utility: utility)
+      
     default:
       throw ProjectError.invalidArguments("Unknown command: \(command)")
     }
@@ -164,7 +208,25 @@ struct CommandRegistry {
       
       // Path Commands
       UpdatePathsCommand.commandName,
-      UpdatePathsMapCommand.commandName
+      UpdatePathsMapCommand.commandName,
+      
+      // Scheme Commands
+      "create-scheme",
+      "duplicate-scheme",
+      "remove-scheme",
+      "list-schemes",
+      "set-scheme-config",
+      "add-scheme-target",
+      "enable-test-coverage",
+      "set-test-parallel",
+      
+      // Workspace Commands
+      "create-workspace",
+      "add-project-to-workspace",
+      "remove-project-from-workspace",
+      "list-workspace-projects",
+      "add-project-reference",
+      "add-cross-project-dependency"
     ]
   }
   
@@ -246,6 +308,38 @@ struct CommandRegistry {
       UpdatePathsCommand.printUsage()
     case UpdatePathsMapCommand.commandName:
       UpdatePathsMapCommand.printUsage()
+      
+    // Scheme Commands
+    case "create-scheme":
+      CreateSchemeCommand.printUsage()
+    case "duplicate-scheme":
+      DuplicateSchemeCommand.printUsage()
+    case "remove-scheme":
+      RemoveSchemeCommand.printUsage()
+    case "list-schemes":
+      ListSchemesCommand.printUsage()
+    case "set-scheme-config":
+      SetSchemeConfigCommand.printUsage()
+    case "add-scheme-target":
+      AddSchemeTargetCommand.printUsage()
+    case "enable-test-coverage":
+      EnableTestCoverageCommand.printUsage()
+    case "set-test-parallel":
+      SetTestParallelCommand.printUsage()
+      
+    // Workspace Commands
+    case "create-workspace":
+      CreateWorkspaceCommand.printUsage()
+    case "add-project-to-workspace":
+      AddProjectToWorkspaceCommand.printUsage()
+    case "remove-project-from-workspace":
+      RemoveProjectFromWorkspaceCommand.printUsage()
+    case "list-workspace-projects":
+      ListWorkspaceProjectsCommand.printUsage()
+    case "add-project-reference":
+      AddProjectReferenceCommand.printUsage()
+    case "add-cross-project-dependency":
+      AddCrossProjectDependencyCommand.printUsage()
       
     default:
       print("Unknown command: \(command)")

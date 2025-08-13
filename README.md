@@ -28,7 +28,7 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 
 ## Features
 
-### 🎯 Complete Project Manipulation
+### 🎯 Complete Project Manipulation (v2.0.0 Enhanced!)
 - **File Management** - Add, remove, move files and folders
 - **Target Management** - Create, duplicate, remove targets
 - **Build Configuration** - Modify build settings and configurations
@@ -36,6 +36,11 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 - **Swift Packages** - Add/remove SPM dependencies with version validation
 - **Build Phases** - Add run scripts and copy files phases
 - **Group Management** - Create and organize project groups
+- **🆕 Scheme Management** - Create, configure, and manage Xcode schemes
+- **🆕 Workspace Support** - Create workspaces and manage multi-project setups
+- **🆕 Cross-Project Dependencies** - Link targets across different projects
+- **🆕 Build Configuration Management** - Advanced .xcconfig file support
+- **🆕 Localization Support** - Manage localizations and variant groups
 
 ### ✨ Smart Features
 - **Recursive folder scanning** with intelligent file filtering
@@ -544,6 +549,28 @@ done
 |---------|-------------|---------|
 | `add-build-phase` | Add run script | `add-build-phase run_script --name "SwiftLint" --target MyApp --script "swiftlint"` |
 | `add-build-phase` | Add copy files | `add-build-phase copy_files --name "Copy Resources" --target MyApp` |
+
+### 🎨 Scheme Management (NEW in v2.0.0)
+| Command | Description | Example |
+|---------|-------------|---------|
+| `create-scheme` | Create new scheme | `create-scheme MyApp --target MyApp --shared` |
+| `duplicate-scheme` | Clone existing scheme | `duplicate-scheme Production Staging` |
+| `remove-scheme` | Delete scheme | `remove-scheme OldScheme` |
+| `list-schemes` | Show all schemes | `list-schemes --shared` |
+| `set-scheme-config` | Set build configurations | `set-scheme-config MyApp --run Debug --archive Release` |
+| `add-scheme-target` | Add target to scheme | `add-scheme-target MyApp MyFramework --action build,test` |
+| `enable-test-coverage` | Enable code coverage | `enable-test-coverage MyApp --targets Core,UI` |
+| `set-test-parallel` | Configure test parallelization | `set-test-parallel MyApp --enable` |
+
+### 🏗️ Workspace Management (NEW in v2.0.0)
+| Command | Description | Example |
+|---------|-------------|---------|
+| `create-workspace` | Create new workspace | `create-workspace MyWorkspace` |
+| `add-project-to-workspace` | Add project to workspace | `add-project-to-workspace MyWorkspace App/App.xcodeproj` |
+| `remove-project-from-workspace` | Remove project from workspace | `remove-project-from-workspace MyWorkspace App.xcodeproj` |
+| `list-workspace-projects` | List workspace projects | `list-workspace-projects MyWorkspace` |
+| `add-project-reference` | Add external project reference | `add-project-reference ../Library/Library.xcodeproj --group Dependencies` |
+| `add-cross-project-dependency` | Add cross-project dependency | `add-cross-project-dependency MyApp ../Lib/Lib.xcodeproj LibTarget` |
 
 
 ## File Filtering
