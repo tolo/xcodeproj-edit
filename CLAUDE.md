@@ -160,6 +160,13 @@ CUPID properties (https://cupid.dev/) focus on creating architectures that are "
 - **NEVER** create a new branch unless explicitly instructed to do so
 - **ABSOLUTELY FORBIDDEN: NEVER USE `git rebase --skip` EVER** (can cause data loss and repository corruption, ask the user for help if you encounter rebase conflicts)
 
+### **KNOWN DESIGN DECISIONS (Don't Second-Guess)**
+- **Single `..` in paths is allowed** - This is intentional for parent directory access
+- **XcodeProjUtility remains large** - Gradual migration planned, see ROADMAP.md
+- **Binary-only distribution** - Swift script removed in v2.0.0, this is permanent
+- **Homebrew as primary distribution** - Optimized for this installation method
+- **No mocking in tests** - Real project manipulation is intentional for authenticity
+
 **Mandatory Reality Check:**
 Before implementing ANY feature, ask:
 1. **What is the core user need?** (e.g., "validate UI looks right")
@@ -308,6 +315,14 @@ ls -la *.xcodeproj.backup
 - Be cautious with build phase scripts
 - Sanitize user input in generated build scripts
 
+### Path Traversal Design Decision
+**Single `..` is intentionally allowed** in path validation for legitimate use cases where files need to be referenced from parent directories (e.g., shared code between projects). This is a deliberate design decision with multiple security layers:
+- Path normalization prevents bypass attempts
+- URL-encoded sequences are decoded and validated
+- Critical system directories are blocked
+- Maximum path length limits prevent resource exhaustion
+- See `PathUtils.sanitizePath()` for implementation details
+
 ## Useful Resources
 
 - [XcodeProj Documentation](https://github.com/tuist/XcodeProj)
@@ -436,3 +451,4 @@ rm test.tar.gz xcodeproj-cli
 - **GitHub**: https://github.com/tolo/xcodeproj-cli
 - **Issues**: https://github.com/tolo/xcodeproj-cli/issues
 - **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for version history
+- **Roadmap**: See [ROADMAP.md](./ROADMAP.md) for planned features and design decisions
