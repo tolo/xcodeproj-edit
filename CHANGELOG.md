@@ -5,7 +5,7 @@ All notable changes to xcodeproj-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-08-12
+## [UNRELEASED] - 2025-08-12
 
 ### ⚠️ BREAKING CHANGES
 - **Removed Swift script version** - xcodeproj-cli is now distributed exclusively as a compiled binary

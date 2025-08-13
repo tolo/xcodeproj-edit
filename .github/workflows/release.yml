@@ -1,4 +1,4 @@
-name: Build and Release
+name: Enhanced Build and Release
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
         
       - name: Update version in source
         run: |
-          # Update version number in main.swift
-          sed -i '' 's/XcodeProj CLI v[0-9]\+\.[0-9]\+\.[0-9]\+/XcodeProj CLI ${{ env.VERSION }}/' Sources/xcodeproj-cli/main.swift
+          # Update version number in CLIInterface.swift
+          sed -i '' 's/let VERSION = ".*"/let VERSION = "${VERSION#v}"/' Sources/xcodeproj-cli/CLI/CLIInterface.swift
           
       - name: Build universal binary
         run: |
@@ -93,14 +93,51 @@ jobs:
           draft: false
           prerelease: false
           
-      - name: Show Homebrew Formula Info
+      - name: Update Homebrew Formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          # This step automatically updates the Homebrew formula
+          # Requires a personal access token with repo scope for the tap repository
+          
+          if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "🍺 Updating Homebrew formula..."
+            
+            # Clone tap repository
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tolo/homebrew-xcodeproj.git tap-repo
+            
+            # Update formula
+            cd tap-repo
+            if [ -f "Formula/xcodeproj-cli.rb" ]; then
+              sed -i '' "s/version \".*\"/version \"${VERSION#v}\"/" Formula/xcodeproj-cli.rb
+              sed -i '' "s|url \".*\"|url \"https://github.com/tolo/xcodeproj-cli/releases/download/${{ env.VERSION }}/xcodeproj-cli-${{ env.VERSION }}-macos.tar.gz\"|" Formula/xcodeproj-cli.rb
+              sed -i '' "s/sha256 \".*\"/sha256 \"${{ env.SHA256 }}\"/" Formula/xcodeproj-cli.rb
+              
+              # Commit and push
+              git add Formula/xcodeproj-cli.rb
+              git commit -m "Update xcodeproj-cli to ${{ env.VERSION }}"
+              git push
+              
+              echo "✅ Homebrew formula updated automatically!"
+            else
+              echo "⚠️ Formula not found, manual update required"
+            fi
+          else
+            echo "ℹ️ HOMEBREW_TAP_TOKEN not set, skipping automatic formula update"
+            echo "Manual update required for Homebrew formula"
+          fi
+          
+      - name: Show Manual Update Info
+        if: env.HOMEBREW_TAP_TOKEN == ''
         run: |
           echo "========================================="
           echo "📦 Homebrew Formula Information"
           echo "========================================="
           echo ""
           echo "Update your Homebrew formula with:"
-          echo "  version: ${{ env.VERSION }}"
+          echo "  version: ${VERSION#v}"
           echo "  url: https://github.com/tolo/xcodeproj-cli/releases/download/${{ env.VERSION }}/xcodeproj-cli-${{ env.VERSION }}-macos.tar.gz"
           echo "  sha256: ${{ env.SHA256 }}"
           echo ""
