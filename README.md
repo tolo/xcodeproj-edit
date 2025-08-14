@@ -1,7 +1,5 @@
 # XcodeProj CLI
 
-**⚠️ Version 2.0 Breaking Change**: The Swift script version has been removed. xcodeproj-cli is now distributed as a compiled binary only.
-
 A powerful command-line utility for manipulating Xcode project files (.xcodeproj) without requiring Xcode or Docker. Designed for both **human developers** and **AI coding assistants** (like Claude Code, GitHub Copilot, and other LLM-based tools) to automate Xcode project management.
 
 **Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 45 commands and 55+ specialized modules, comprehensive test suite with 136+ tests, and `--verbose` flag for detailed operation insights.
@@ -86,16 +84,6 @@ The tool will be available as `xcodeproj-cli` in your PATH:
 xcodeproj-cli --help
 xcodeproj-cli --project MyApp.xcodeproj list-targets
 ```
-
-#### Quick Install Script
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/tolo/xcodeproj-cli/main/install.sh)"
-```
-
-This installer will:
-- Install via Homebrew if available
-- Or download the binary directly
-- Set up the tool for immediate use
 
 #### Manual Binary Install
 Download pre-built binary from releases:
@@ -718,7 +706,7 @@ The tool provides clear error messages for common issues:
 | Execution Speed | ✅ Fastest | ❌ Slower | ❌ Slow |
 | Command Line | ✅ | ✅ | ❌ |
 | Scriptable | ✅ | ✅ | ⚠️ |
-| All Project Features | ✅ | ✅ | ✅ |
+| All Project Features | ✅ | ⚠️ | ✅ |
 | Universal Binary | ✅ | ❌ Docker | ✅ |
 
 ## Troubleshooting
@@ -798,7 +786,7 @@ Areas for contribution:
 
 ## License
 
-This tool is provided as-is for use in your projects. Feel free to modify and distribute as needed.
+MIT License - see [LICENSE](./LICENSE) file for details.
 
 ## Project Structure
 
@@ -870,7 +858,3 @@ https://github.com/tolo/xcodeproj-cli
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md) for a detailed history of changes.
-
----
-
-*A comprehensive Xcode project manipulation tool*
