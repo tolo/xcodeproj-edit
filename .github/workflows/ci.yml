@@ -41,11 +41,6 @@ jobs:
           echo "Swift version:"
           swift --version
       
-      - name: Setup Swift
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.0"
-      
       - name: Build
         run: |
           swift build -c release --verbose
