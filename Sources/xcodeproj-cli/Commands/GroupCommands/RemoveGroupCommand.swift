@@ -52,7 +52,7 @@ struct RemoveGroupCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveGroupCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

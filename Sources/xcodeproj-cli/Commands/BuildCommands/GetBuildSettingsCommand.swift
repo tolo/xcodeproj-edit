@@ -74,7 +74,7 @@ struct GetBuildSettingsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension GetBuildSettingsCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

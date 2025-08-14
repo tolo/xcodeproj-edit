@@ -158,21 +158,30 @@ struct SecurityUtils {
     // Normalize path by resolving . and .. components
     let normalizedPath = (decodedPath as NSString).standardizingPath
 
-    // Block path traversal attempts that try to escape project boundaries
-    if normalizedPath.contains("../..") || normalizedPath.contains("..\\..")
-      || normalizedPath.contains("..\\..") || normalizedPath.hasPrefix("../")
-    {
-      // Allow single ../ only if it doesn't result in escaping the project root
-      let components = normalizedPath.components(separatedBy: "/")
-      var depth = 0
-      for component in components {
-        if component == ".." {
-          depth -= 1
-          if depth < 0 {  // Never allow going above project root
-            return nil
-          }
-        } else if !component.isEmpty && component != "." {
-          depth += 1
+    // Simple depth-based path traversal prevention
+    // Check if any ".." sequence would take us above the project root
+    let components = normalizedPath.components(separatedBy: "/")
+    var depth = 0
+    for component in components {
+      if component == ".." {
+        depth -= 1
+        if depth < 0 {  // Never allow going above project root
+          return nil
+        }
+      } else if !component.isEmpty && component != "." {
+        depth += 1
+      }
+    }
+
+    // For absolute paths, block critical system directories and sensitive locations
+    if normalizedPath.hasPrefix("/") {
+      let criticalDirs = [
+        "/System/", "/usr/", "/bin/", "/sbin/", "/var/", "/tmp/", "/etc/",
+        "/proc/", "/dev/", "/boot/", "/root/", "/Library/System/", "/private/",
+      ]
+      for dir in criticalDirs {
+        if normalizedPath.hasPrefix(dir) {
+          return nil
         }
       }
     }

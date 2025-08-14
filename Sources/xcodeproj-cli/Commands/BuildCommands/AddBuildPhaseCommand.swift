@@ -69,7 +69,7 @@ struct AddBuildPhaseCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddBuildPhaseCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

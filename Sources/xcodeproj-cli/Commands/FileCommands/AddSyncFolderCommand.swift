@@ -71,14 +71,13 @@ struct AddSyncFolderCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddSyncFolderCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
-  @MainActor
   private static func parseTargets(from targetsString: String) -> [String] {
     return BaseCommand.parseTargets(from: targetsString)
   }

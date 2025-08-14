@@ -88,7 +88,7 @@ struct AddSwiftPackageCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddSwiftPackageCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

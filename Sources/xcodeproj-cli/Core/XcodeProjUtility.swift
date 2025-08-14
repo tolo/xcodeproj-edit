@@ -56,16 +56,22 @@ class XcodeProjUtility {
       return  // No transaction in progress
     }
 
-    // Save changes
+    // Save changes first
     try save()
 
-    // Remove backup
-    if FileManager.default.fileExists(atPath: backupPath.string) {
-      try FileManager.default.removeItem(atPath: backupPath.string)
+    // Remove backup - only clear transaction state after successful cleanup
+    do {
+      if FileManager.default.fileExists(atPath: backupPath.string) {
+        try FileManager.default.removeItem(atPath: backupPath.string)
+      }
+      transactionBackupPath = nil
+      print("✅ Transaction committed")
+    } catch {
+      // Backup cleanup failed - clear transaction state but log warning
+      transactionBackupPath = nil
+      print("⚠️  Transaction committed but backup cleanup failed: \(error.localizedDescription)")
+      // Don't throw - the main operation (save) succeeded
     }
-
-    transactionBackupPath = nil
-    print("✅ Transaction committed")
   }
 
   func rollbackTransaction() throws {
@@ -79,10 +85,15 @@ class XcodeProjUtility {
         try FileManager.default.removeItem(atPath: projectPath.string)
       }
       try FileManager.default.moveItem(atPath: backupPath.string, toPath: projectPath.string)
-    }
 
-    transactionBackupPath = nil
-    print("↩️  Transaction rolled back")
+      // Only clear transaction path after successful restore
+      transactionBackupPath = nil
+      print("↩️  Transaction rolled back")
+    } else {
+      // Backup doesn't exist - clear transaction state but warn
+      transactionBackupPath = nil
+      print("⚠️  Transaction backup not found - clearing transaction state")
+    }
   }
 
   // MARK: - File Operations

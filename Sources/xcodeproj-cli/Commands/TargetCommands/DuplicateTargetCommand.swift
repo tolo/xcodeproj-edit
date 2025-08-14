@@ -62,7 +62,7 @@ struct DuplicateTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension DuplicateTargetCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

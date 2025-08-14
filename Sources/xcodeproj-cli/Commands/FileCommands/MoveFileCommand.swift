@@ -62,7 +62,7 @@ struct MoveFileCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension MoveFileCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

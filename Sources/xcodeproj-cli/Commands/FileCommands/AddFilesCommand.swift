@@ -105,7 +105,6 @@ struct AddFilesCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddFilesCommand {
-  @MainActor
   private static func parseTargets(from targetsString: String) -> [String] {
     return BaseCommand.parseTargets(from: targetsString)
   }

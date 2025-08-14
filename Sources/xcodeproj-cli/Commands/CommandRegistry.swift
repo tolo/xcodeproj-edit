@@ -8,393 +8,218 @@
 import Foundation
 import XcodeProj
 
+/// Command handler type for dictionary-based registration
+typealias CommandHandler = @MainActor (ParsedArguments, XcodeProjUtility) throws -> Void
+typealias CommandUsageHandler = () -> Void
+typealias WorkspaceCommandHandler = @MainActor (ParsedArguments, Bool) throws -> Void
+
 /// Registry for managing and executing commands
 @MainActor
 struct CommandRegistry {
 
+  // MARK: - Command Registration
+
+  /// Dictionary of all registered commands
+  private static let commands: [String: CommandHandler] = [
+    // File Commands
+    AddFileCommand.commandName: AddFileCommand.execute,
+    AddFilesCommand.commandName: AddFilesCommand.execute,
+    AddFolderCommand.commandName: AddFolderCommand.execute,
+    AddSyncFolderCommand.commandName: AddSyncFolderCommand.execute,
+    RemoveFileCommand.commandName: RemoveFileCommand.execute,
+    MoveFileCommand.commandName: MoveFileCommand.execute,
+
+    // Target Commands
+    AddTargetCommand.commandName: AddTargetCommand.execute,
+    DuplicateTargetCommand.commandName: DuplicateTargetCommand.execute,
+    AddDependencyCommand.commandName: AddDependencyCommand.execute,
+    ListTargetsCommand.commandName: ListTargetsCommand.execute,
+    RemoveTargetCommand.commandName: RemoveTargetCommand.execute,
+
+    // Group Commands
+    CreateGroupsCommand.commandName: CreateGroupsCommand.execute,
+    ListGroupsCommand.commandName: ListGroupsCommand.execute,
+    RemoveGroupCommand.commandName: RemoveGroupCommand.execute,
+
+    // Build Commands
+    SetBuildSettingCommand.commandName: SetBuildSettingCommand.execute,
+    GetBuildSettingsCommand.commandName: GetBuildSettingsCommand.execute,
+    ListBuildSettingsCommand.commandName: ListBuildSettingsCommand.execute,
+    AddBuildPhaseCommand.commandName: AddBuildPhaseCommand.execute,
+    ListBuildConfigsCommand.commandName: ListBuildConfigsCommand.execute,
+
+    // Framework Commands
+    AddFrameworkCommand.commandName: AddFrameworkCommand.execute,
+
+    // Package Commands
+    AddSwiftPackageCommand.commandName: AddSwiftPackageCommand.execute,
+    RemoveSwiftPackageCommand.commandName: RemoveSwiftPackageCommand.execute,
+    ListSwiftPackagesCommand.commandName: ListSwiftPackagesCommand.execute,
+    UpdateSwiftPackagesCommand.commandName: UpdateSwiftPackagesCommand.execute,
+
+    // Inspection Commands
+    ValidateCommand.commandName: ValidateCommand.execute,
+    ListFilesCommand.commandName: ListFilesCommand.execute,
+    ListTreeCommand.commandName: ListTreeCommand.execute,
+    ListInvalidReferencesCommand.commandName: ListInvalidReferencesCommand.execute,
+    RemoveInvalidReferencesCommand.commandName: RemoveInvalidReferencesCommand.execute,
+
+    // Path Commands
+    UpdatePathsCommand.commandName: UpdatePathsCommand.execute,
+    UpdatePathsMapCommand.commandName: UpdatePathsMapCommand.execute,
+
+    // Scheme Commands
+    CreateSchemeCommand.commandName: CreateSchemeCommand.execute,
+    DuplicateSchemeCommand.commandName: DuplicateSchemeCommand.execute,
+    RemoveSchemeCommand.commandName: RemoveSchemeCommand.execute,
+    ListSchemesCommand.commandName: ListSchemesCommand.execute,
+    SetSchemeConfigCommand.commandName: SetSchemeConfigCommand.execute,
+    AddSchemeTargetCommand.commandName: AddSchemeTargetCommand.execute,
+    EnableTestCoverageCommand.commandName: EnableTestCoverageCommand.execute,
+    SetTestParallelCommand.commandName: SetTestParallelCommand.execute,
+
+    // Workspace Commands
+    "create-workspace": CreateWorkspaceCommand.execute,
+    "add-project-to-workspace": AddProjectToWorkspaceCommand.execute,
+    "remove-project-from-workspace": RemoveProjectFromWorkspaceCommand.execute,
+    "list-workspace-projects": ListWorkspaceProjectsCommand.execute,
+    "add-project-reference": AddProjectReferenceCommand.execute,
+    "add-cross-project-dependency": AddCrossProjectDependencyCommand.execute,
+  ]
+
+  /// Set of read-only commands
+  private static let readOnlyCommands: Set<String> = [
+    // Inspection Commands
+    ValidateCommand.commandName,
+    ListFilesCommand.commandName,
+    ListTreeCommand.commandName,
+    ListInvalidReferencesCommand.commandName,
+
+    // List Commands
+    ListTargetsCommand.commandName,
+    ListGroupsCommand.commandName,
+    ListBuildConfigsCommand.commandName,
+    ListBuildSettingsCommand.commandName,
+    GetBuildSettingsCommand.commandName,
+    ListSwiftPackagesCommand.commandName,
+    ListSchemesCommand.commandName,
+    "list-workspace-projects",
+  ]
+
+  /// Dictionary of command usage handlers
+  private static let usageHandlers: [String: CommandUsageHandler] = [
+    // File Commands
+    AddFileCommand.commandName: AddFileCommand.printUsage,
+    AddFilesCommand.commandName: AddFilesCommand.printUsage,
+    AddFolderCommand.commandName: AddFolderCommand.printUsage,
+    AddSyncFolderCommand.commandName: AddSyncFolderCommand.printUsage,
+    RemoveFileCommand.commandName: RemoveFileCommand.printUsage,
+    MoveFileCommand.commandName: MoveFileCommand.printUsage,
+
+    // Target Commands
+    AddTargetCommand.commandName: AddTargetCommand.printUsage,
+    DuplicateTargetCommand.commandName: DuplicateTargetCommand.printUsage,
+    AddDependencyCommand.commandName: AddDependencyCommand.printUsage,
+    ListTargetsCommand.commandName: ListTargetsCommand.printUsage,
+    RemoveTargetCommand.commandName: RemoveTargetCommand.printUsage,
+
+    // Group Commands
+    CreateGroupsCommand.commandName: CreateGroupsCommand.printUsage,
+    ListGroupsCommand.commandName: ListGroupsCommand.printUsage,
+    RemoveGroupCommand.commandName: RemoveGroupCommand.printUsage,
+
+    // Build Commands
+    SetBuildSettingCommand.commandName: SetBuildSettingCommand.printUsage,
+    GetBuildSettingsCommand.commandName: GetBuildSettingsCommand.printUsage,
+    ListBuildSettingsCommand.commandName: ListBuildSettingsCommand.printUsage,
+    AddBuildPhaseCommand.commandName: AddBuildPhaseCommand.printUsage,
+    ListBuildConfigsCommand.commandName: ListBuildConfigsCommand.printUsage,
+
+    // Framework Commands
+    AddFrameworkCommand.commandName: AddFrameworkCommand.printUsage,
+
+    // Package Commands
+    AddSwiftPackageCommand.commandName: AddSwiftPackageCommand.printUsage,
+    RemoveSwiftPackageCommand.commandName: RemoveSwiftPackageCommand.printUsage,
+    ListSwiftPackagesCommand.commandName: ListSwiftPackagesCommand.printUsage,
+    UpdateSwiftPackagesCommand.commandName: UpdateSwiftPackagesCommand.printUsage,
+
+    // Inspection Commands
+    ValidateCommand.commandName: ValidateCommand.printUsage,
+    ListFilesCommand.commandName: ListFilesCommand.printUsage,
+    ListTreeCommand.commandName: ListTreeCommand.printUsage,
+    ListInvalidReferencesCommand.commandName: ListInvalidReferencesCommand.printUsage,
+    RemoveInvalidReferencesCommand.commandName: RemoveInvalidReferencesCommand.printUsage,
+
+    // Path Commands
+    UpdatePathsCommand.commandName: UpdatePathsCommand.printUsage,
+    UpdatePathsMapCommand.commandName: UpdatePathsMapCommand.printUsage,
+
+    // Scheme Commands
+    CreateSchemeCommand.commandName: CreateSchemeCommand.printUsage,
+    DuplicateSchemeCommand.commandName: DuplicateSchemeCommand.printUsage,
+    RemoveSchemeCommand.commandName: RemoveSchemeCommand.printUsage,
+    ListSchemesCommand.commandName: ListSchemesCommand.printUsage,
+    SetSchemeConfigCommand.commandName: SetSchemeConfigCommand.printUsage,
+    AddSchemeTargetCommand.commandName: AddSchemeTargetCommand.printUsage,
+    EnableTestCoverageCommand.commandName: EnableTestCoverageCommand.printUsage,
+    SetTestParallelCommand.commandName: SetTestParallelCommand.printUsage,
+
+    // Workspace Commands
+    "create-workspace": CreateWorkspaceCommand.printUsage,
+    "add-project-to-workspace": AddProjectToWorkspaceCommand.printUsage,
+    "remove-project-from-workspace": RemoveProjectFromWorkspaceCommand.printUsage,
+    "list-workspace-projects": ListWorkspaceProjectsCommand.printUsage,
+    "add-project-reference": AddProjectReferenceCommand.printUsage,
+    "add-cross-project-dependency": AddCrossProjectDependencyCommand.printUsage,
+  ]
+
+  // MARK: - Public Methods
+
   /// Execute a command by name with given arguments
   static func execute(command: String, arguments: ParsedArguments, utility: XcodeProjUtility) throws
   {
-    switch command {
-    // File Commands
-    case AddFileCommand.commandName:
-      try AddFileCommand.execute(with: arguments, utility: utility)
-
-    case AddFilesCommand.commandName:
-      try AddFilesCommand.execute(with: arguments, utility: utility)
-
-    case AddFolderCommand.commandName:
-      try AddFolderCommand.execute(with: arguments, utility: utility)
-
-    case AddSyncFolderCommand.commandName:
-      try AddSyncFolderCommand.execute(with: arguments, utility: utility)
-
-    case RemoveFileCommand.commandName:
-      try RemoveFileCommand.execute(with: arguments, utility: utility)
-
-    case MoveFileCommand.commandName:
-      try MoveFileCommand.execute(with: arguments, utility: utility)
-
-    // Target Commands
-    case AddTargetCommand.commandName:
-      try AddTargetCommand.execute(with: arguments, utility: utility)
-
-    case DuplicateTargetCommand.commandName:
-      try DuplicateTargetCommand.execute(with: arguments, utility: utility)
-
-    case AddDependencyCommand.commandName:
-      try AddDependencyCommand.execute(with: arguments, utility: utility)
-
-    case ListTargetsCommand.commandName:
-      try ListTargetsCommand.execute(with: arguments, utility: utility)
-
-    case RemoveTargetCommand.commandName:
-      try RemoveTargetCommand.execute(with: arguments, utility: utility)
-
-    // Group Commands
-    case CreateGroupsCommand.commandName:
-      try CreateGroupsCommand.execute(with: arguments, utility: utility)
-
-    case ListGroupsCommand.commandName:
-      try ListGroupsCommand.execute(with: arguments, utility: utility)
-
-    case RemoveGroupCommand.commandName:
-      try RemoveGroupCommand.execute(with: arguments, utility: utility)
-
-    // Build Commands
-    case SetBuildSettingCommand.commandName:
-      try SetBuildSettingCommand.execute(with: arguments, utility: utility)
-
-    case GetBuildSettingsCommand.commandName:
-      try GetBuildSettingsCommand.execute(with: arguments, utility: utility)
-
-    case ListBuildSettingsCommand.commandName:
-      try ListBuildSettingsCommand.execute(with: arguments, utility: utility)
-
-    case AddBuildPhaseCommand.commandName:
-      try AddBuildPhaseCommand.execute(with: arguments, utility: utility)
-
-    case ListBuildConfigsCommand.commandName:
-      try ListBuildConfigsCommand.execute(with: arguments, utility: utility)
-
-    // Framework Commands
-    case AddFrameworkCommand.commandName:
-      try AddFrameworkCommand.execute(with: arguments, utility: utility)
-
-    // Package Commands
-    case AddSwiftPackageCommand.commandName:
-      try AddSwiftPackageCommand.execute(with: arguments, utility: utility)
-
-    case RemoveSwiftPackageCommand.commandName:
-      try RemoveSwiftPackageCommand.execute(with: arguments, utility: utility)
-
-    case ListSwiftPackagesCommand.commandName:
-      try ListSwiftPackagesCommand.execute(with: arguments, utility: utility)
-
-    case UpdateSwiftPackagesCommand.commandName:
-      try UpdateSwiftPackagesCommand.execute(with: arguments, utility: utility)
-
-    // Inspection Commands
-    case ValidateCommand.commandName:
-      try ValidateCommand.execute(with: arguments, utility: utility)
-
-    case ListFilesCommand.commandName:
-      try ListFilesCommand.execute(with: arguments, utility: utility)
-
-    case ListTreeCommand.commandName:
-      try ListTreeCommand.execute(with: arguments, utility: utility)
-
-    case ListInvalidReferencesCommand.commandName:
-      try ListInvalidReferencesCommand.execute(with: arguments, utility: utility)
-
-    case RemoveInvalidReferencesCommand.commandName:
-      try RemoveInvalidReferencesCommand.execute(with: arguments, utility: utility)
-
-    // Path Commands
-    case UpdatePathsCommand.commandName:
-      try UpdatePathsCommand.execute(with: arguments, utility: utility)
-
-    case UpdatePathsMapCommand.commandName:
-      try UpdatePathsMapCommand.execute(with: arguments, utility: utility)
-
-    // Scheme Commands
-    case CreateSchemeCommand.commandName:
-      try CreateSchemeCommand.execute(with: arguments, utility: utility)
-
-    case DuplicateSchemeCommand.commandName:
-      try DuplicateSchemeCommand.execute(with: arguments, utility: utility)
-
-    case RemoveSchemeCommand.commandName:
-      try RemoveSchemeCommand.execute(with: arguments, utility: utility)
-
-    case ListSchemesCommand.commandName:
-      try ListSchemesCommand.execute(with: arguments, utility: utility)
-
-    case SetSchemeConfigCommand.commandName:
-      try SetSchemeConfigCommand.execute(with: arguments, utility: utility)
-
-    case AddSchemeTargetCommand.commandName:
-      try AddSchemeTargetCommand.execute(with: arguments, utility: utility)
-
-    case EnableTestCoverageCommand.commandName:
-      try EnableTestCoverageCommand.execute(with: arguments, utility: utility)
-
-    case SetTestParallelCommand.commandName:
-      try SetTestParallelCommand.execute(with: arguments, utility: utility)
-
-    // Workspace Commands
-    case "create-workspace":
-      try CreateWorkspaceCommand.execute(with: arguments, utility: utility)
-
-    case "add-project-to-workspace":
-      try AddProjectToWorkspaceCommand.execute(with: arguments, utility: utility)
-
-    case "remove-project-from-workspace":
-      try RemoveProjectFromWorkspaceCommand.execute(with: arguments, utility: utility)
-
-    case "list-workspace-projects":
-      try ListWorkspaceProjectsCommand.execute(with: arguments, utility: utility)
-
-    case "add-project-reference":
-      try AddProjectReferenceCommand.execute(with: arguments, utility: utility)
-
-    case "add-cross-project-dependency":
-      try AddCrossProjectDependencyCommand.execute(with: arguments, utility: utility)
-
-    default:
+    guard let handler = commands[command] else {
       throw ProjectError.invalidArguments("Unknown command: \(command)")
     }
+
+    try handler(arguments, utility)
   }
 
   /// Check if a command is read-only (doesn't modify the project)
   static func isReadOnlyCommand(_ command: String) -> Bool {
-    switch command {
-    // Inspection Commands
-    case ValidateCommand.commandName,
-      ListFilesCommand.commandName,
-      ListTreeCommand.commandName,
-      ListInvalidReferencesCommand.commandName:
-      return true
-
-    // List Commands
-    case ListTargetsCommand.commandName,
-      ListGroupsCommand.commandName,
-      ListBuildConfigsCommand.commandName,
-      ListBuildSettingsCommand.commandName,
-      GetBuildSettingsCommand.commandName,
-      ListSwiftPackagesCommand.commandName,
-      ListSchemesCommand.commandName,
-      "list-workspace-projects":
-      return true
-
-    default:
-      return false
-    }
+    return readOnlyCommands.contains(command)
   }
 
   /// Get list of all available commands
   static func availableCommands() -> [String] {
-    return [
-      // File Commands
-      AddFileCommand.commandName,
-      AddFilesCommand.commandName,
-      AddFolderCommand.commandName,
-      AddSyncFolderCommand.commandName,
-      RemoveFileCommand.commandName,
-      MoveFileCommand.commandName,
-
-      // Target Commands
-      AddTargetCommand.commandName,
-      DuplicateTargetCommand.commandName,
-      AddDependencyCommand.commandName,
-      ListTargetsCommand.commandName,
-      RemoveTargetCommand.commandName,
-
-      // Group Commands
-      CreateGroupsCommand.commandName,
-      ListGroupsCommand.commandName,
-      RemoveGroupCommand.commandName,
-
-      // Build Commands
-      SetBuildSettingCommand.commandName,
-      GetBuildSettingsCommand.commandName,
-      ListBuildSettingsCommand.commandName,
-      AddBuildPhaseCommand.commandName,
-      ListBuildConfigsCommand.commandName,
-
-      // Framework Commands
-      AddFrameworkCommand.commandName,
-
-      // Package Commands
-      AddSwiftPackageCommand.commandName,
-      RemoveSwiftPackageCommand.commandName,
-      ListSwiftPackagesCommand.commandName,
-      UpdateSwiftPackagesCommand.commandName,
-
-      // Inspection Commands
-      ValidateCommand.commandName,
-      ListFilesCommand.commandName,
-      ListTreeCommand.commandName,
-      ListInvalidReferencesCommand.commandName,
-      RemoveInvalidReferencesCommand.commandName,
-
-      // Path Commands
-      UpdatePathsCommand.commandName,
-      UpdatePathsMapCommand.commandName,
-
-      // Scheme Commands
-      CreateSchemeCommand.commandName,
-      DuplicateSchemeCommand.commandName,
-      RemoveSchemeCommand.commandName,
-      ListSchemesCommand.commandName,
-      SetSchemeConfigCommand.commandName,
-      AddSchemeTargetCommand.commandName,
-      EnableTestCoverageCommand.commandName,
-      SetTestParallelCommand.commandName,
-
-      // Workspace Commands
-      "create-workspace",
-      "add-project-to-workspace",
-      "remove-project-from-workspace",
-      "list-workspace-projects",
-      "add-project-reference",
-      "add-cross-project-dependency",
-    ]
+    return Array(commands.keys).sorted()
   }
+
+  /// Dictionary of workspace-specific commands
+  private static let workspaceCommands: [String: WorkspaceCommandHandler] = [
+    "create-workspace": CreateWorkspaceCommand.executeAsWorkspaceCommand,
+    "add-project-to-workspace": AddProjectToWorkspaceCommand.executeAsWorkspaceCommand,
+    "remove-project-from-workspace": RemoveProjectFromWorkspaceCommand.executeAsWorkspaceCommand,
+    "list-workspace-projects": ListWorkspaceProjectsCommand.executeAsWorkspaceCommand,
+  ]
 
   /// Execute a workspace command that doesn't require a project context
   static func executeWorkspaceCommand(command: String, arguments: ParsedArguments, verbose: Bool)
     throws
   {
-    switch command {
-    case "create-workspace":
-      try CreateWorkspaceCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
-    case "add-project-to-workspace":
-      try AddProjectToWorkspaceCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
-    case "remove-project-from-workspace":
-      try RemoveProjectFromWorkspaceCommand.executeAsWorkspaceCommand(
-        with: arguments, verbose: verbose)
-    case "list-workspace-projects":
-      try ListWorkspaceProjectsCommand.executeAsWorkspaceCommand(with: arguments, verbose: verbose)
-    default:
+    guard let handler = workspaceCommands[command] else {
       throw ProjectError.invalidArguments("Unknown workspace command: \(command)")
     }
+
+    try handler(arguments, verbose)
   }
 
   /// Print usage information for a specific command
   static func printCommandUsage(_ command: String) {
-    switch command {
-    // File Commands
-    case AddFileCommand.commandName:
-      AddFileCommand.printUsage()
-    case AddFilesCommand.commandName:
-      AddFilesCommand.printUsage()
-    case AddFolderCommand.commandName:
-      AddFolderCommand.printUsage()
-    case AddSyncFolderCommand.commandName:
-      AddSyncFolderCommand.printUsage()
-    case RemoveFileCommand.commandName:
-      RemoveFileCommand.printUsage()
-    case MoveFileCommand.commandName:
-      MoveFileCommand.printUsage()
-
-    // Target Commands
-    case AddTargetCommand.commandName:
-      AddTargetCommand.printUsage()
-    case DuplicateTargetCommand.commandName:
-      DuplicateTargetCommand.printUsage()
-    case AddDependencyCommand.commandName:
-      AddDependencyCommand.printUsage()
-    case ListTargetsCommand.commandName:
-      ListTargetsCommand.printUsage()
-    case RemoveTargetCommand.commandName:
-      RemoveTargetCommand.printUsage()
-
-    // Group Commands
-    case CreateGroupsCommand.commandName:
-      CreateGroupsCommand.printUsage()
-    case ListGroupsCommand.commandName:
-      ListGroupsCommand.printUsage()
-    case RemoveGroupCommand.commandName:
-      RemoveGroupCommand.printUsage()
-
-    // Build Commands
-    case SetBuildSettingCommand.commandName:
-      SetBuildSettingCommand.printUsage()
-    case GetBuildSettingsCommand.commandName:
-      GetBuildSettingsCommand.printUsage()
-    case ListBuildSettingsCommand.commandName:
-      ListBuildSettingsCommand.printUsage()
-    case AddBuildPhaseCommand.commandName:
-      AddBuildPhaseCommand.printUsage()
-    case ListBuildConfigsCommand.commandName:
-      ListBuildConfigsCommand.printUsage()
-
-    // Framework Commands
-    case AddFrameworkCommand.commandName:
-      AddFrameworkCommand.printUsage()
-
-    // Package Commands
-    case AddSwiftPackageCommand.commandName:
-      AddSwiftPackageCommand.printUsage()
-    case RemoveSwiftPackageCommand.commandName:
-      RemoveSwiftPackageCommand.printUsage()
-    case ListSwiftPackagesCommand.commandName:
-      ListSwiftPackagesCommand.printUsage()
-    case UpdateSwiftPackagesCommand.commandName:
-      UpdateSwiftPackagesCommand.printUsage()
-
-    // Inspection Commands
-    case ValidateCommand.commandName:
-      ValidateCommand.printUsage()
-    case ListFilesCommand.commandName:
-      ListFilesCommand.printUsage()
-    case ListTreeCommand.commandName:
-      ListTreeCommand.printUsage()
-    case ListInvalidReferencesCommand.commandName:
-      ListInvalidReferencesCommand.printUsage()
-    case RemoveInvalidReferencesCommand.commandName:
-      RemoveInvalidReferencesCommand.printUsage()
-
-    // Path Commands
-    case UpdatePathsCommand.commandName:
-      UpdatePathsCommand.printUsage()
-    case UpdatePathsMapCommand.commandName:
-      UpdatePathsMapCommand.printUsage()
-
-    // Scheme Commands
-    case CreateSchemeCommand.commandName:
-      CreateSchemeCommand.printUsage()
-    case DuplicateSchemeCommand.commandName:
-      DuplicateSchemeCommand.printUsage()
-    case RemoveSchemeCommand.commandName:
-      RemoveSchemeCommand.printUsage()
-    case ListSchemesCommand.commandName:
-      ListSchemesCommand.printUsage()
-    case SetSchemeConfigCommand.commandName:
-      SetSchemeConfigCommand.printUsage()
-    case AddSchemeTargetCommand.commandName:
-      AddSchemeTargetCommand.printUsage()
-    case EnableTestCoverageCommand.commandName:
-      EnableTestCoverageCommand.printUsage()
-    case SetTestParallelCommand.commandName:
-      SetTestParallelCommand.printUsage()
-
-    // Workspace Commands
-    case "create-workspace":
-      CreateWorkspaceCommand.printUsage()
-    case "add-project-to-workspace":
-      AddProjectToWorkspaceCommand.printUsage()
-    case "remove-project-from-workspace":
-      RemoveProjectFromWorkspaceCommand.printUsage()
-    case "list-workspace-projects":
-      ListWorkspaceProjectsCommand.printUsage()
-    case "add-project-reference":
-      AddProjectReferenceCommand.printUsage()
-    case "add-cross-project-dependency":
-      AddCrossProjectDependencyCommand.printUsage()
-
-    default:
+    if let usageHandler = usageHandlers[command] {
+      usageHandler()
+    } else {
       print("Unknown command: \(command)")
     }
   }

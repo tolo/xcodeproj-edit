@@ -53,7 +53,7 @@ struct RemoveTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveTargetCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

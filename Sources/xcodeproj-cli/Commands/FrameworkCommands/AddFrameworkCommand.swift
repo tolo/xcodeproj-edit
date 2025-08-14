@@ -74,7 +74,7 @@ struct AddFrameworkCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddFrameworkCommand {
-  @MainActor
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
