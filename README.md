@@ -4,7 +4,7 @@
 
 A powerful command-line utility for manipulating Xcode project files (.xcodeproj) without requiring Xcode or Docker. Designed for both **human developers** and **AI coding assistants** (like Claude Code, GitHub Copilot, and other LLM-based tools) to automate Xcode project management.
 
-**Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 55+ specialized modules, comprehensive test suites, and `--verbose` flag for detailed operation insights.
+**Version 2.0.0 Improvements**: Enhanced security, performance optimizations through intelligent caching, modular architecture with 45 commands and 55+ specialized modules, comprehensive test suite with 136+ tests, and `--verbose` flag for detailed operation insights.
 
 ## Acknowledgments
 
@@ -28,7 +28,7 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 
 ## Features
 
-### 🎯 Complete Project Manipulation
+### 🎯 Complete Project Manipulation (v2.0.0 Enhanced!)
 - **File Management** - Add, remove, move files and folders
 - **Target Management** - Create, duplicate, remove targets
 - **Build Configuration** - Modify build settings and configurations
@@ -36,6 +36,11 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 - **Swift Packages** - Add/remove SPM dependencies with version validation
 - **Build Phases** - Add run scripts and copy files phases
 - **Group Management** - Create and organize project groups
+- **🆕 Scheme Management** - Create, configure, and manage Xcode schemes
+- **🆕 Workspace Support** - Create workspaces and manage multi-project setups
+- **🆕 Cross-Project Dependencies** - Link targets across different projects
+- **🆕 Build Configuration Management** - Advanced .xcconfig file support
+- **🆕 Localization Support** - Manage localizations and variant groups
 
 ### ✨ Smart Features
 - **Recursive folder scanning** with intelligent file filtering
@@ -545,6 +550,28 @@ done
 | `add-build-phase` | Add run script | `add-build-phase run_script --name "SwiftLint" --target MyApp --script "swiftlint"` |
 | `add-build-phase` | Add copy files | `add-build-phase copy_files --name "Copy Resources" --target MyApp` |
 
+### 🎨 Scheme Management (NEW in v2.0.0)
+| Command | Description | Example |
+|---------|-------------|---------|
+| `create-scheme` | Create new scheme | `create-scheme MyApp --target MyApp --shared` |
+| `duplicate-scheme` | Clone existing scheme | `duplicate-scheme Production Staging` |
+| `remove-scheme` | Delete scheme | `remove-scheme OldScheme` |
+| `list-schemes` | Show all schemes | `list-schemes --shared` |
+| `set-scheme-config` | Set build configurations | `set-scheme-config MyApp --run Debug --archive Release` |
+| `add-scheme-target` | Add target to scheme | `add-scheme-target MyApp MyFramework --action build,test` |
+| `enable-test-coverage` | Enable code coverage | `enable-test-coverage MyApp --targets Core,UI` |
+| `set-test-parallel` | Configure test parallelization | `set-test-parallel MyApp --enable` |
+
+### 🏗️ Workspace Management (NEW in v2.0.0)
+| Command | Description | Example |
+|---------|-------------|---------|
+| `create-workspace` | Create new workspace | `create-workspace MyWorkspace` |
+| `add-project-to-workspace` | Add project to workspace | `add-project-to-workspace MyWorkspace App/App.xcodeproj` |
+| `remove-project-from-workspace` | Remove project from workspace | `remove-project-from-workspace MyWorkspace App.xcodeproj` |
+| `list-workspace-projects` | List workspace projects | `list-workspace-projects MyWorkspace` |
+| `add-project-reference` | Add external project reference | `add-project-reference ../Library/Library.xcodeproj --group Dependencies` |
+| `add-cross-project-dependency` | Add cross-project dependency | `add-cross-project-dependency MyApp ../Lib/Lib.xcodeproj LibTarget` |
+
 
 ## File Filtering
 
@@ -712,15 +739,58 @@ swift build -c release
 cp -r PhotoEditor.xcodeproj PhotoEditor.xcodeproj.backup
 ```
 
+## Testing
+
+The project includes a comprehensive test suite with 136+ tests covering all functionality using Swift Package Manager.
+
+### Running Tests
+
+```bash
+# Run all tests using Swift Package Manager
+swift test
+
+# Run specific test suites
+swift test --filter ValidationTests      # Read-only validation tests
+swift test --filter FileOperationsTests  # File manipulation tests
+swift test --filter BuildAndTargetTests  # Target and build tests
+swift test --filter PackageTests         # Swift package tests
+swift test --filter SecurityTests        # Security tests
+
+# Run with code coverage
+swift test --enable-code-coverage
+
+# Run tests in parallel for faster execution
+swift test --parallel
+```
+
+### Test Categories
+
+- **BasicTests** - Core CLI functionality
+- **ValidationTests** - Read-only operations that don't modify projects
+- **FileOperationsTests** - File and folder manipulation  
+- **BuildAndTargetTests** - Target management and build settings
+- **ComprehensiveTests** - Full feature coverage tests
+- **IntegrationTests** - Complex multi-command workflows
+- **PackageTests** - Swift Package Manager integration
+- **SecurityTests** - Path traversal and injection protection
+- **AdditionalTests** - Edge cases and error handling
+
 ## Contributing
 
 This tool is open for improvements! Feel free to:
 
-1. Add new commands for specific workflows
-2. Enhance error messages
-3. Add more file type support
-4. Improve performance
-5. Add tests
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass (`swift test`)
+5. Submit a pull request
+
+Areas for contribution:
+- Add new commands for specific workflows
+- Enhance error messages
+- Add more file type support
+- Improve performance
+- Expand test coverage
 
 ## License
 
@@ -744,12 +814,20 @@ xcodeproj-cli/
 ├── .github/
 │   └── workflows/
 │       └── release.yml        # Automated release workflow
-├── test/
-│   ├── TestSuite.swift        # Comprehensive test suite
-│   ├── SecurityTests.swift    # Security-focused test coverage
-│   ├── AdditionalTests.swift  # Extended test scenarios
-│   └── TestData/
-│       └── TestProject.xcodeproj/  # Test project for validation
+├── Tests/
+│   └── xcodeproj-cliTests/    # Swift Package Manager tests (136+ tests)
+│       ├── BasicTests.swift           # Core functionality tests
+│       ├── FileOperationsTests.swift  # File manipulation tests
+│       ├── BuildAndTargetTests.swift  # Target and build configuration tests
+│       ├── ComprehensiveTests.swift   # Complete feature coverage tests
+│       ├── ValidationTests.swift      # Project validation tests
+│       ├── IntegrationTests.swift     # Complex workflow tests
+│       ├── PackageTests.swift         # Swift Package Manager tests
+│       ├── SecurityTests.swift        # Security-focused test coverage
+│       ├── AdditionalTests.swift      # Extended test scenarios
+│       ├── TestHelpers.swift          # Shared test utilities
+│       └── TestResources/             # Test project and sample files
+│           └── TestProject.xcodeproj/ # Test project for validation
 ├── README.md                  # This file
 ├── CHANGELOG.md              # Version history and changes
 ├── LICENSE                   # MIT License

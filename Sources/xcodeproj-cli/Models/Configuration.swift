@@ -11,7 +11,7 @@ import Foundation
 struct Configuration {
   let projectPath: String
   let verbose: Bool
-  
+
   init(projectPath: String = "MyProject.xcodeproj", verbose: Bool = false) {
     self.projectPath = projectPath
     self.verbose = verbose

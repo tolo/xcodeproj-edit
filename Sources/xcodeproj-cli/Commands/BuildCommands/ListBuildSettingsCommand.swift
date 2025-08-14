@@ -11,9 +11,10 @@ import XcodeProj
 /// Command for listing build settings with various filtering options
 struct ListBuildSettingsCommand: Command {
   static let commandName = "list-build-settings"
-  
+
   static let description = "List build settings for project or target"
-  
+
+  static let isReadOnly = true
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Get optional flags
     let targetName = arguments.getFlag("--target", "-t")
@@ -21,24 +22,25 @@ struct ListBuildSettingsCommand: Command {
     let showInherited = arguments.hasFlag("--show-inherited", "-i")
     let outputJSON = arguments.hasFlag("--json", "-j")
     let showAll = arguments.hasFlag("--all", "-a")
-    
+
     // Validate target if specified
     if let target = targetName {
       try validateTargets([target], in: utility)
     }
-    
+
     // Execute the command
     utility.listBuildSettings(
-      targetName: targetName, 
-      configuration: config, 
+      targetName: targetName,
+      configuration: config,
       showInherited: showInherited,
-      outputJSON: outputJSON, 
+      outputJSON: outputJSON,
       showAll: showAll
     )
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       list-build-settings [--target <target>] [--config <config>] [--show-inherited] [--json] [--all]
         List build settings for project or target
         
@@ -66,7 +68,8 @@ struct ListBuildSettingsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension ListBuildSettingsCommand {
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

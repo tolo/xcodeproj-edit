@@ -11,48 +11,50 @@ import XcodeProj
 /// Command for adding files from a filesystem folder to project group
 struct AddFolderCommand: Command {
   static let commandName = "add-folder"
-  
+
   static let description = "Add files from filesystem folder to project group"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 1, 
-      usage: "add-folder requires: <folder-path> --group <group> --targets <target1,target2> [--recursive]"
+      arguments,
+      count: 1,
+      usage:
+        "add-folder requires: <folder-path> --group <group> --targets <target1,target2> [--recursive]"
     )
-    
+
     let folderPath = arguments.positional[0]
-    
+
     // Get required flags
     let group = try arguments.requireFlag(
-      "--group", "-g", 
+      "--group", "-g",
       error: "add-folder requires --group or -g flag"
     )
-    
+
     let targetsStr = try arguments.requireFlag(
-      "--targets", "-t", 
+      "--targets", "-t",
       error: "add-folder requires --targets or -t flag"
     )
-    
+
     let targets = parseTargets(from: targetsStr)
     let recursive = arguments.hasFlag("--recursive", "-r")
-    
+
     // Validate inputs
     try validateGroup(group, in: utility)
     try validateTargets(targets, in: utility)
-    
+
     // Execute the command
     try utility.addFolder(
-      folderPath: folderPath, 
-      to: group, 
-      targets: targets, 
+      folderPath: folderPath,
+      to: group,
+      targets: targets,
       recursive: recursive
     )
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       add-folder <folder-path> --group <group> --targets <target1,target2> [--recursive]
         Add files from filesystem folder to project group
         
@@ -71,18 +73,21 @@ struct AddFolderCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddFolderCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
+
   private static func parseTargets(from targetsString: String) -> [String] {
     return BaseCommand.parseTargets(from: targetsString)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
-  
+
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

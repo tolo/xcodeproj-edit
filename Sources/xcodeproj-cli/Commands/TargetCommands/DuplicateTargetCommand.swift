@@ -11,32 +11,33 @@ import XcodeProj
 /// Command for duplicating an existing target with optional bundle ID override
 struct DuplicateTargetCommand: Command {
   static let commandName = "duplicate-target"
-  
+
   static let description = "Duplicate an existing target with a new name"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 2, 
+      arguments,
+      count: 2,
       usage: "duplicate-target requires: <source-target> <new-name> [--bundle-id <bundle-id>]"
     )
-    
+
     let sourceTarget = arguments.positional[0]
     let newName = arguments.positional[1]
-    
+
     // Get optional bundle ID flag
     let bundleId = arguments.getFlag("--bundle-id", "-b")
-    
+
     // Validate source target exists
     try validateTargets([sourceTarget], in: utility)
-    
+
     // Execute the command
     try utility.duplicateTarget(source: sourceTarget, newName: newName, newBundleId: bundleId)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       duplicate-target <source-target> <new-name> [--bundle-id <bundle-id>]
         Duplicate an existing target with a new name
         
@@ -60,11 +61,14 @@ struct DuplicateTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension DuplicateTargetCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

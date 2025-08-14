@@ -45,7 +45,7 @@ brew untap tolo/xcodeproj
 ## Features
 
 - 🚀 **Fast**: Pre-compiled universal binary (Intel + Apple Silicon)
-- 🔧 **Powerful**: 30+ commands for project manipulation
+- 🔧 **Powerful**: 45 commands for project manipulation
 - 🔒 **Secure**: Built with comprehensive security protections
 - 📦 **No Dependencies**: Standalone binary with everything included
 - ⚡ **Performance**: Intelligent caching and batch operations

@@ -26,33 +26,60 @@ struct CLIInterface {
         --version         Display version information
         --help, -h        Show this help message
 
-      FILE & FOLDER OPERATIONS:
-        
-        Understanding Groups, Folders, and References:
-        • add-group: Creates empty virtual groups for organization (yellow folder icon)
-        • add-folder: Creates a group and adds files from a filesystem folder (yellow folder icon)
-        • add-sync-folder: Creates a folder reference that auto-syncs with filesystem (blue folder icon in Xcode 16+)
-        • remove-group: Removes any group, folder group, or synced folder from the project
-        
-        add-file <file-path> --group <group> --targets <target1,target2>
-          Add a single file to specified group and targets
-          Short flags: -g for group, -t for targets
-          Example: add-file Sources/Model.swift --group Models --targets MyApp,MyAppTests
-          Example: add-file Helper.swift -g Utils -t MyApp
+      COMMON COMMANDS:
 
-        add-files <pattern> --group <group> --targets <target1,target2>
-          Add multiple files matching pattern to group and targets
-          Example: add-files "Sources/**/*.swift" --group Sources --targets MyApp
+      File & Folder Operations:
+        add-file <file> --group <group> --targets <target1,target2>
+          Add file to project (short: -g, -t)
+        add-folder <folder> --group <group> --targets <targets> [--recursive]
+          Add folder contents to project
+        remove-file <file> [--targets <targets>]
+          Remove file from project or specific targets
+        create-groups <group1/subgroup> [<group2>...]
+          Create group hierarchies
 
-        add-folder <folder-path> --group <group> --targets <target1,target2> [--recursive]
-          Add files from filesystem folder to project group
-          Example: add-folder Sources/Utils --group Utils --targets MyApp --recursive
+      Target Management:
+        list-targets                    List all targets in project
+        add-target <name> --type <type> --bundle-id <id>
+          Create new target (types: app, framework, test)
+        duplicate-target <source> <destination>
+          Clone existing target with new name
+        add-dependency <target> --depends-on <other-target>
+          Add target dependency
 
-      For full command reference, visit: https://github.com/tolo/xcodeproj-cli
+      Build Configuration:
+        list-build-configs [--target <target>]
+          Show available build configurations
+        set-build-setting <key> <value> --targets <targets> --configs <configs>
+          Set build settings for targets/configs
+        get-build-settings <target> [--configs <config>]
+          Get build settings for a target
+
+      Project Inspection:
+        validate                        Check project integrity
+        list-tree                       Display project structure as tree
+        list-files [<group>]           List files in project or group
+        list-groups                     Show group hierarchy
+
+      Swift Packages:
+        add-swift-package <url> --version <version> --target <target>
+          Add Swift Package dependency
+        list-swift-packages             Show all package dependencies
+        remove-swift-package <url>      Remove package dependency
+
+      Schemes & Workspaces:
+        create-scheme <name> <target>   Create new scheme
+        list-schemes                    List all schemes
+        create-workspace <name>         Create new workspace
+        add-project-to-workspace <workspace> <project>
+          Add project to workspace
+
+      For detailed usage of any command, use: xcodeproj-cli <command> --help
+      Full documentation: https://github.com/tolo/xcodeproj-cli
       """
     )
   }
-  
+
   static func printVersion() {
     print("xcodeproj-cli version \(version)")
   }

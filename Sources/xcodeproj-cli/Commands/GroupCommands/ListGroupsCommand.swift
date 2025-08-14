@@ -11,15 +11,17 @@ import XcodeProj
 /// Command for listing groups in a tree structure
 struct ListGroupsCommand: Command {
   static let commandName = "list-groups"
-  
+
   static let description = "List groups in the project as a tree structure"
-  
+
+  static let isReadOnly = true
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     utility.listGroupsTree()
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       list-groups
         List groups in the project as a tree structure
         

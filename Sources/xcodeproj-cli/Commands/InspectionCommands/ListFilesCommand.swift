@@ -11,14 +11,17 @@ import XcodeProj
 /// Command for listing files in the project or a specific group
 struct ListFilesCommand: Command {
   static let commandName = "list-files"
-  
+
   static let description = "List files in the project or a specific group"
   
+  static let isReadOnly = true
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let groupName = arguments.positional.first
-    
+
     if let name = groupName,
-       let group = XcodeProjectHelpers.findGroup(named: name, in: utility.pbxproj.groups) {
+      let group = XcodeProjectHelpers.findGroup(named: name, in: utility.pbxproj.groups)
+    {
       print("📁 Files in group '\(name)':")
       ListFilesCommand.listFilesInGroup(group)
     } else if let name = groupName {
@@ -32,9 +35,10 @@ struct ListFilesCommand: Command {
       }
     }
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       list-files [group-name]
         List files in the project or a specific group
         

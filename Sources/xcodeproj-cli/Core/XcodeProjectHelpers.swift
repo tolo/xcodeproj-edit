@@ -6,12 +6,12 @@
 //
 
 import Foundation
-import XcodeProj
 import PathKit
+import XcodeProj
 
 /// Helper functions for working with Xcode project components
 struct XcodeProjectHelpers {
-  
+
   /// Find a group by name in the project hierarchy
   static func findGroup(named name: String, in groups: [PBXGroup]) -> PBXGroup? {
     for group in groups {
@@ -25,19 +25,21 @@ struct XcodeProjectHelpers {
     }
     return nil
   }
-  
+
   /// Check if a file already exists in the project
   static func fileExists(path: String, in pbxproj: PBXProj) -> Bool {
     return pbxproj.fileReferences.contains { $0.path == path || $0.name == path }
   }
-  
+
   /// Find the sources build phase for a target
   static func sourceBuildPhase(for target: PBXNativeTarget) -> PBXSourcesBuildPhase? {
     return target.buildPhases.first(where: { $0 is PBXSourcesBuildPhase }) as? PBXSourcesBuildPhase
   }
-  
+
   /// Find a group by its path components
-  static func findGroupByPath(_ path: String, in groups: [PBXGroup], rootGroup: PBXGroup) -> PBXGroup? {
+  static func findGroupByPath(_ path: String, in groups: [PBXGroup], rootGroup: PBXGroup)
+    -> PBXGroup?
+  {
     let pathComponents = path.split(separator: "/").map(String.init)
     var currentGroup = rootGroup
 

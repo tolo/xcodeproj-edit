@@ -5,7 +5,7 @@ All notable changes to xcodeproj-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED] - 2025-08-12
+## [2.0.0] - 2025-08-12
 
 ### ⚠️ BREAKING CHANGES
 - **Removed Swift script version** - xcodeproj-cli is now distributed exclusively as a compiled binary
@@ -17,15 +17,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance Optimizations**: Multi-level intelligent caching system with O(1) lookups for groups, targets, and file references
 - **Security Enhancements**: Comprehensive input validation, path sanitization, and command injection prevention
 - **Verbose Mode**: `--verbose` flag provides detailed operation timing, cache statistics, and performance metrics
-- **Enhanced Test Suites**: Security-focused tests, integration tests, and performance validation
+- **Enhanced Test Suites**: 136+ tests using Swift Package Manager, including security-focused tests, integration tests, and performance validation
 - **Core Services**: Transaction management, project validation, cache management, and build phase management
 - **Performance Profiling**: Built-in performance monitoring with timing reports and memory usage tracking
+- **Scheme Management**: Complete suite of 8 commands for creating, configuring, and managing Xcode schemes
+- **Workspace Support**: Full workspace management with 6 new commands for multi-project setups
+- **Cross-Project Dependencies**: Support for linking targets across different projects
+- **Build Configuration Management**: Advanced .xcconfig file support with diff, copy, and export features
+- **Localization Support**: Manage project localizations and variant groups for internationalization
 - Swift Package Manager configuration (`Package.swift`)
 - Universal binary build support (Intel + Apple Silicon)
 - GitHub Actions workflow for automated releases
 - Pre-built binary distribution via GitHub Releases
 - Homebrew tap support for easy installation
 - ARCHITECTURE.md documentation for developers
+
+### New Commands (35+ commands added)
+#### Scheme Management
+- `create-scheme` - Create new schemes for targets
+- `duplicate-scheme` - Clone existing schemes
+- `remove-scheme` - Delete schemes
+- `list-schemes` - List all project schemes
+- `set-scheme-config` - Configure scheme build settings
+- `add-scheme-target` - Add targets to scheme build actions
+- `enable-test-coverage` - Enable code coverage in schemes
+- `set-test-parallel` - Configure test parallelization
+
+#### Workspace Management
+- `create-workspace` - Create new Xcode workspaces
+- `add-project-to-workspace` - Add projects to workspaces
+- `remove-project-from-workspace` - Remove projects from workspaces
+- `list-workspace-projects` - List all workspace projects
+- `add-project-reference` - Add external project references
+- `add-cross-project-dependency` - Create cross-project target dependencies
 
 ### Changed
 - **Architecture Refactoring**: Migrated from single-file script to modular, service-oriented architecture

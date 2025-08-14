@@ -11,26 +11,27 @@ import XcodeProj
 /// Command for updating file paths using prefix replacement
 struct UpdatePathsCommand: Command {
   static let commandName = "update-paths"
-  
+
   static let description = "Update file paths with prefix replacement"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 2, 
+      arguments,
+      count: 2,
       usage: "update-paths requires: <old-prefix> <new-prefix>"
     )
-    
+
     let oldPrefix = arguments.positional[0]
     let newPrefix = arguments.positional[1]
-    
+
     // Execute the command
     utility.updatePathsWithPrefix(from: oldPrefix, to: newPrefix)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       update-paths <old-prefix> <new-prefix>
         Update file paths with prefix replacement
         
@@ -52,7 +53,9 @@ struct UpdatePathsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension UpdatePathsCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 }

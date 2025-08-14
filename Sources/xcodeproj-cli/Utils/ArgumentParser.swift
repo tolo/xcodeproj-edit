@@ -9,7 +9,7 @@ import Foundation
 
 /// Utility for parsing command-line arguments
 struct ArgumentParser {
-  
+
   /// Parse command line arguments into a ParsedArguments structure
   static func parseArguments(_ args: [String]) -> ParsedArguments {
     var parsed = ParsedArguments()
@@ -17,7 +17,7 @@ struct ArgumentParser {
 
     while i < args.count {
       let arg = args[i]
-      
+
       // Validate argument length to prevent resource exhaustion
       guard arg.count <= 512 else {
         print("❌ Error: Argument too long (maximum 512 characters)")

@@ -11,34 +11,35 @@ import XcodeProj
 /// Command for adding a dependency relationship between targets
 struct AddDependencyCommand: Command {
   static let commandName = "add-dependency"
-  
+
   static let description = "Add a dependency relationship between targets"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
     try requirePositionalArguments(
-      arguments, 
-      count: 1, 
+      arguments,
+      count: 1,
       usage: "add-dependency requires: <target> --depends-on <target>"
     )
-    
+
     let target = arguments.positional[0]
-    
+
     // Get required depends-on flag
     let dependsOn = try arguments.requireFlag(
-      "--depends-on", 
+      "--depends-on",
       error: "add-dependency requires --depends-on flag"
     )
-    
+
     // Validate both targets exist
     try validateTargets([target, dependsOn], in: utility)
-    
+
     // Execute the command
     try utility.addDependency(to: target, dependsOn: dependsOn)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       add-dependency <target> --depends-on <dependency-target>
         Add a dependency relationship between targets
         
@@ -60,11 +61,14 @@ struct AddDependencyCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddDependencyCommand {
-  private static func requirePositionalArguments(_ arguments: ParsedArguments, count: Int, usage: String) throws {
+  private static func requirePositionalArguments(
+    _ arguments: ParsedArguments, count: Int, usage: String
+  ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

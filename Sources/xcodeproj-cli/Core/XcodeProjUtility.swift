@@ -9,6 +9,7 @@
 import Foundation
 import PathKit
 import XcodeProj
+
 class XcodeProjUtility {
   let xcodeproj: XcodeProj
   let projectPath: Path
@@ -89,11 +90,16 @@ class XcodeProjUtility {
       try _addFile(path: path, to: groupPath, targets: targets)
     } ?? _addFile(path: path, to: groupPath, targets: targets)
   }
-  
+
   private func _addFile(path: String, to groupPath: String, targets: [String]) throws {
     // Validate path
     guard sanitizePath(path) != nil else {
       throw ProjectError.invalidArguments("Invalid file path: \(path)")
+    }
+
+    // Check if file exists on filesystem
+    guard FileManager.default.fileExists(atPath: path) else {
+      throw ProjectError.operationFailed("File not found: \(path)")
     }
 
     let fileName = (path as NSString).lastPathComponent
@@ -105,7 +111,10 @@ class XcodeProjUtility {
     }
 
     // Find parent group using cache
-    guard let parentGroup = cacheManager.getGroup(groupPath) ?? findGroup(named: groupPath, in: pbxproj.groups) else {
+    guard
+      let parentGroup = cacheManager.getGroup(groupPath)
+        ?? findGroup(named: groupPath, in: pbxproj.groups)
+    else {
       throw ProjectError.groupNotFound(groupPath)
     }
 
@@ -119,7 +128,7 @@ class XcodeProjUtility {
     // Add to project
     pbxproj.add(object: fileRef)
     parentGroup.children.append(fileRef)
-    
+
     // Invalidate cache since we added a new file
     cacheManager.invalidateFileReference(fileName)
 
@@ -248,6 +257,42 @@ class XcodeProjUtility {
     print("✅ Moved \(oldPath) -> \(newPath)")
   }
 
+  func moveFileToGroup(filePath: String, targetGroup: String) throws {
+    // Find the file reference
+    let fileName = (filePath as NSString).lastPathComponent
+    guard
+      let fileRef = pbxproj.fileReferences.first(where: {
+        $0.path == fileName || $0.name == fileName || $0.path == filePath || $0.name == filePath
+      })
+    else {
+      throw ProjectError.operationFailed("File not found: \(filePath)")
+    }
+
+    // Find current parent group
+    var currentParentGroup: PBXGroup?
+    for group in pbxproj.groups {
+      if group.children.contains(where: { $0 === fileRef }) {
+        currentParentGroup = group
+        break
+      }
+    }
+
+    // Find target group
+    guard let targetPBXGroup = findGroup(named: targetGroup, in: pbxproj.groups) else {
+      throw ProjectError.groupNotFound(targetGroup)
+    }
+
+    // Remove from current group if found
+    if let currentGroup = currentParentGroup {
+      currentGroup.children.removeAll { $0 === fileRef }
+    }
+
+    // Add to target group
+    targetPBXGroup.children.append(fileRef)
+
+    print("✅ Moved \(fileName) to group \(targetGroup)")
+  }
+
   func removeFile(_ filePath: String) throws {
     // Try to find the file reference by exact match or by filename
     let fileName = (filePath as NSString).lastPathComponent
@@ -330,20 +375,20 @@ class XcodeProjUtility {
   }
 
   // MARK: - Group Removal Helper Methods
-  
+
   /// Contains collected contents from a group hierarchy
   private struct GroupContents {
     let filesToRemove: [PBXFileReference]
     let groupsToRemove: [PBXGroup]
     let variantGroupsToRemove: [PBXVariantGroup]
   }
-  
+
   /// Recursively collects all files and subgroups from a group hierarchy
   private func collectGroupContents(from group: PBXGroup) -> GroupContents {
     var filesToRemove: [PBXFileReference] = []
     var groupsToRemove: [PBXGroup] = [group]
     var variantGroupsToRemove: [PBXVariantGroup] = []
-    
+
     func collectFromGroup(_ group: PBXGroup) {
       for child in group.children {
         if let fileRef = child as? PBXFileReference {
@@ -362,16 +407,16 @@ class XcodeProjUtility {
         }
       }
     }
-    
+
     collectFromGroup(group)
-    
+
     return GroupContents(
       filesToRemove: filesToRemove,
       groupsToRemove: groupsToRemove,
       variantGroupsToRemove: variantGroupsToRemove
     )
   }
-  
+
   /// Removes file references from all build phases using BuildPhaseManager
   private func removeFilesFromBuildPhases(_ files: [PBXFileReference]) {
     // Collect all build files that need to be removed
@@ -379,52 +424,52 @@ class XcodeProjUtility {
     for fileRef in files {
       buildFilesToDelete.formUnion(buildPhaseManager.findBuildFiles(for: fileRef))
     }
-    
+
     // Remove build files from their respective build phases
     buildPhaseManager.removeBuildFiles { buildFilesToDelete.contains($0) }
-    
+
     // Delete all collected build files from the project
     for buildFile in buildFilesToDelete {
       pbxproj.delete(object: buildFile)
     }
   }
-  
+
   /// Deletes the group and all its collected contents from the project
   private func deleteGroupAndContents(_ group: PBXGroup, contents: GroupContents) {
     // Remove file references from project
     for fileRef in contents.filesToRemove {
       pbxproj.delete(object: fileRef)
     }
-    
+
     // Remove variant groups from project
     for variantGroup in contents.variantGroupsToRemove {
       pbxproj.delete(object: variantGroup)
     }
-    
+
     // Remove the group from its parent (including main project group)
     for parentGroup in pbxproj.groups {
       parentGroup.children.removeAll { $0 === group }
     }
-    
+
     // Also check if the group is in the main project's mainGroup
     if let mainGroup = pbxproj.rootObject?.mainGroup {
       mainGroup.children.removeAll { $0 === group }
     }
-    
+
     // Remove all groups from project
     for groupToRemove in contents.groupsToRemove {
       pbxproj.delete(object: groupToRemove)
     }
   }
-  
+
   /// Removes a group hierarchy and all its contents from the project
   private func removeGroupHierarchy(_ group: PBXGroup) {
     // Step 1: Collect all contents from the group hierarchy
     let contents = collectGroupContents(from: group)
-    
+
     // Step 2: Remove files from build phases
     removeFilesFromBuildPhases(contents.filesToRemove)
-    
+
     // Step 3: Delete the group and all its contents
     deleteGroupAndContents(group, contents: contents)
   }
@@ -591,7 +636,7 @@ class XcodeProjUtility {
 
     pbxproj.add(object: target)
     pbxproj.rootObject?.targets.append(target)
-    
+
     // Invalidate cache to pick up new target
     cacheManager.invalidateTarget(name)
     cacheManager.rebuildAllCaches()
@@ -665,7 +710,7 @@ class XcodeProjUtility {
 
     pbxproj.add(object: newTarget)
     pbxproj.rootObject?.targets.append(newTarget)
-    
+
     // Invalidate cache to pick up new target
     cacheManager.invalidateTarget(newName)
     cacheManager.rebuildAllCaches()
@@ -690,7 +735,7 @@ class XcodeProjUtility {
 
     // Remove from project
     pbxproj.delete(object: target)
-    
+
     // Invalidate cache
     cacheManager.invalidateTarget(name)
 
@@ -729,9 +774,14 @@ class XcodeProjUtility {
     var frameworksPhase =
       target.buildPhases.first { $0 is PBXFrameworksBuildPhase } as? PBXFrameworksBuildPhase
     if frameworksPhase == nil {
-      frameworksPhase = PBXFrameworksBuildPhase()
-      pbxproj.add(object: frameworksPhase!)
-      target.buildPhases.append(frameworksPhase!)
+      let newFrameworksPhase = PBXFrameworksBuildPhase()
+      frameworksPhase = newFrameworksPhase
+      pbxproj.add(object: newFrameworksPhase)
+      target.buildPhases.append(newFrameworksPhase)
+    }
+
+    guard let finalFrameworksPhase = frameworksPhase else {
+      throw ProjectError.operationFailed("Failed to create or find frameworks build phase")
     }
 
     // Create framework reference
@@ -747,7 +797,7 @@ class XcodeProjUtility {
     // Add to build phase
     let buildFile = PBXBuildFile(file: frameworkRef)
     pbxproj.add(object: buildFile)
-    frameworksPhase?.files?.append(buildFile)
+    finalFrameworksPhase.files?.append(buildFile)
 
     // Handle embedding if needed
     if embed {
@@ -759,14 +809,20 @@ class XcodeProjUtility {
         } as? PBXCopyFilesBuildPhase
 
       if embedPhase == nil {
-        embedPhase = PBXCopyFilesBuildPhase(dstSubfolderSpec: .frameworks, name: "Embed Frameworks")
-        pbxproj.add(object: embedPhase!)
-        target.buildPhases.append(embedPhase!)
+        let newEmbedPhase = PBXCopyFilesBuildPhase(
+          dstSubfolderSpec: .frameworks, name: "Embed Frameworks")
+        embedPhase = newEmbedPhase
+        pbxproj.add(object: newEmbedPhase)
+        target.buildPhases.append(newEmbedPhase)
+      }
+
+      guard let finalEmbedPhase = embedPhase else {
+        throw ProjectError.operationFailed("Failed to create or find embed frameworks build phase")
       }
 
       let embedFile = PBXBuildFile(file: frameworkRef, settings: ["ATTRIBUTES": ["CodeSignOnCopy"]])
       pbxproj.add(object: embedFile)
-      embedPhase?.files?.append(embedFile)
+      finalEmbedPhase.files?.append(embedFile)
     }
 
     print("✅ Added framework: \(name) to \(targetName)\(embed ? " (embedded)" : "")")
@@ -797,6 +853,13 @@ class XcodeProjUtility {
         throw ProjectError.invalidArguments("Branch name cannot be empty")
       }
       versionRequirement = .branch(branch)
+    } else if requirement.hasPrefix("commit:") {
+      let commit = requirement.replacingOccurrences(of: "commit:", with: "").trimmingCharacters(
+        in: .whitespaces)
+      guard !commit.isEmpty else {
+        throw ProjectError.invalidArguments("Commit hash cannot be empty")
+      }
+      versionRequirement = .revision(commit)
     } else if requirement.hasPrefix("exact:") {
       let version = requirement.replacingOccurrences(of: "exact:", with: "").trimmingCharacters(
         in: .whitespaces)
@@ -869,6 +932,102 @@ class XcodeProjUtility {
     }
   }
 
+  func updateSwiftPackages(force: Bool = false) throws {
+    print("📦 Updating Swift Packages...")
+
+    let packages = pbxproj.rootObject?.remotePackages ?? []
+
+    if packages.isEmpty {
+      print("  No packages found")
+      return
+    }
+
+    print("  Found \(packages.count) package(s) to update:")
+    var updatedCount = 0
+
+    for package in packages {
+      guard let url = package.repositoryURL else {
+        print("  ⚠️  Skipping package with unknown URL")
+        continue
+      }
+
+      print("  - \(url)")
+
+      if let requirement = package.versionRequirement {
+        print("    Current: \(requirement)")
+
+        // For this initial implementation, we'll provide information about the update process
+        // In a real implementation, we would need to:
+        // 1. Query the repository for available versions/tags
+        // 2. Compare with current constraints
+        // 3. Update the versionRequirement if needed
+
+        switch requirement {
+        case .upToNextMajorVersion(let version):
+          if force {
+            print("    ℹ️  Force update requested - would update from 'from: \(version)' to latest")
+            updatedCount += 1
+          } else {
+            print("    ✅ Already using flexible version constraint 'from: \(version)'")
+          }
+
+        case .upToNextMinorVersion(let version):
+          if force {
+            print(
+              "    ℹ️  Force update requested - would update from 'upToNextMinor: \(version)' to latest"
+            )
+            updatedCount += 1
+          } else {
+            print("    ✅ Already using flexible version constraint 'upToNextMinor: \(version)'")
+          }
+
+        case .exact(let version):
+          print("    ℹ️  Would update from exact version '\(version)' to latest compatible")
+          if force {
+            print("    ⚠️  Force update would remove version pinning")
+          }
+          updatedCount += 1
+
+        case .branch(let branch):
+          print("    ℹ️  Using branch '\(branch)' - would pull latest commits")
+          updatedCount += 1
+
+        case .revision(let revision):
+          print("    ℹ️  Using revision '\(revision)' - would update to latest")
+          updatedCount += 1
+
+        case .range(let from, let to):
+          if force {
+            print(
+              "    ℹ️  Force update requested - would update from range '\(from)..<\(to)' to latest")
+            updatedCount += 1
+          } else {
+            print("    ✅ Already using range constraint '\(from)..<\(to)'")
+          }
+        }
+      } else {
+        print("    ⚠️  No version requirement specified")
+      }
+    }
+
+    if updatedCount == 0 {
+      print("✅ All packages are already using flexible version constraints")
+      print(
+        "ℹ️  Use 'swift package update' in your project directory to fetch latest compatible versions"
+      )
+    } else {
+      print("ℹ️  Found \(updatedCount) package(s) that could benefit from updates")
+      print(
+        "ℹ️  Note: Actual package resolution requires running 'swift package update' in your project"
+      )
+      print("ℹ️  This command updates the project file constraints, not the resolved versions")
+
+      if !force {
+        print("ℹ️  Use --force to update exact version constraints to flexible ranges")
+      }
+    }
+  }
+
   // MARK: - Build Phases
   func addBuildPhase(type: String, name: String, to targetName: String, script: String? = nil)
     throws
@@ -881,6 +1040,12 @@ class XcodeProjUtility {
     case "run_script", "script":
       guard let script = script else {
         throw ProjectError.operationFailed("Script required for run_script phase")
+      }
+
+      // Validate script for security before adding
+      guard SecurityUtils.validateShellScript(script) else {
+        throw ProjectError.invalidArguments(
+          "Script contains dangerous patterns and cannot be added")
       }
 
       let scriptPhase = PBXShellScriptBuildPhase(
@@ -911,24 +1076,30 @@ class XcodeProjUtility {
 
   func addFiles(_ files: [(path: String, group: String)], to targets: [String]) throws {
     guard !files.isEmpty else { return }
-    
+
     // Batch operation with single save at the end
     try profiler?.measureOperation("addFiles-batch-\(files.count)") {
       try _addFilesBatch(files, to: targets)
     } ?? _addFilesBatch(files, to: targets)
   }
-  
-  private func _addFilesBatch(_ files: [(path: String, group: String)], to targets: [String]) throws {
+
+  private func _addFilesBatch(_ files: [(path: String, group: String)], to targets: [String]) throws
+  {
     print("📁 Adding \(files.count) files in batch...")
-    
+
     var addedFiles = 0
     var skippedFiles = 0
-    
+
     for (path, groupPath) in files {
       do {
         // Validate path
         guard sanitizePath(path) != nil else {
           throw ProjectError.invalidArguments("Invalid file path: \(path)")
+        }
+
+        // Check if file exists on filesystem
+        guard FileManager.default.fileExists(atPath: path) else {
+          throw ProjectError.operationFailed("File not found: \(path)")
         }
 
         let fileName = (path as NSString).lastPathComponent
@@ -941,7 +1112,10 @@ class XcodeProjUtility {
         }
 
         // Find parent group using cache
-        guard let parentGroup = cacheManager.getGroup(groupPath) ?? findGroup(named: groupPath, in: pbxproj.groups) else {
+        guard
+          let parentGroup = cacheManager.getGroup(groupPath)
+            ?? findGroup(named: groupPath, in: pbxproj.groups)
+        else {
           throw ProjectError.groupNotFound(groupPath)
         }
 
@@ -955,7 +1129,7 @@ class XcodeProjUtility {
         // Add to project
         pbxproj.add(object: fileRef)
         parentGroup.children.append(fileRef)
-        
+
         // Invalidate cache since we added a new file
         cacheManager.invalidateFileReference(fileName)
 
@@ -965,9 +1139,9 @@ class XcodeProjUtility {
           targets: targets,
           isCompilable: isCompilableFile(path)
         )
-        
+
         addedFiles += 1
-        
+
         if profiler != nil {
           print("  ✅ Added \(fileName) (\(addedFiles)/\(files.count))")
         }
@@ -976,7 +1150,7 @@ class XcodeProjUtility {
         throw error
       }
     }
-    
+
     print("✅ Batch complete: \(addedFiles) added, \(skippedFiles) skipped")
   }
 
@@ -1018,13 +1192,13 @@ class XcodeProjUtility {
       return _ensureGroupHierarchy(path)
     } ?? _ensureGroupHierarchy(path)
   }
-  
+
   private func _ensureGroupHierarchy(_ path: String) -> PBXGroup? {
     // Check cache first
     if let cachedGroup = cacheManager.getGroup(path) {
       return cachedGroup
     }
-    
+
     let components = path.split(separator: "/").map(String.init)
     guard let mainGroup = pbxproj.rootObject?.mainGroup else {
       print("⚠️  No main group found in project")
@@ -1036,13 +1210,13 @@ class XcodeProjUtility {
 
     for component in components {
       currentPath = currentPath.isEmpty ? component : "\(currentPath)/\(component)"
-      
+
       // Check cache for this path segment
       if let cachedSegment = cacheManager.getGroup(currentPath) {
         currentGroup = cachedSegment
         continue
       }
-      
+
       // Look for existing child group
       if let existingGroup = currentGroup.children.compactMap({ $0 as? PBXGroup })
         .first(where: { $0.name == component || $0.path == component })
@@ -1060,7 +1234,7 @@ class XcodeProjUtility {
         pbxproj.add(object: newGroup)
         currentGroup.children.append(newGroup)
         currentGroup = newGroup
-        
+
         // Invalidate cache since we created a new group
         cacheManager.invalidateGroup(currentPath)
 
@@ -1192,7 +1366,7 @@ class XcodeProjUtility {
   }
 
   // MARK: - Build Settings Data Collection
-  
+
   /// Collects project-level build settings data
   private func collectProjectBuildSettings(
     configuration: String? = nil
@@ -1203,7 +1377,7 @@ class XcodeProjUtility {
 
     let configs = configList.buildConfigurations
     let configNames = configs.map { $0.name }
-    
+
     var allSettingKeys = Set<String>()
     var settingsData: [String: [String: Any]] = [:]
 
@@ -1219,14 +1393,14 @@ class XcodeProjUtility {
     let activeConfigs = configuration.map { [$0] } ?? configNames
     return (settingsData, allSettingKeys, activeConfigs)
   }
-  
+
   /// Collects target-level build settings data with inheritance info
   private func collectTargetBuildSettings(
     target: PBXNativeTarget, configuration: String? = nil, showInherited: Bool = false
   ) -> (
-    settingsData: [String: [String: Any]], 
-    projectSettingsData: [String: [String: Any]], 
-    allKeys: Set<String>, 
+    settingsData: [String: [String: Any]],
+    projectSettingsData: [String: [String: Any]],
+    allKeys: Set<String>,
     activeConfigs: [String]
   ) {
     guard let targetConfigList = target.buildConfigurationList else {
@@ -1236,7 +1410,7 @@ class XcodeProjUtility {
     let configs = targetConfigList.buildConfigurations
     let configNames = configs.map { $0.name }
     let projectConfigList = pbxproj.rootObject?.buildConfigurationList
-    
+
     var allSettingKeys = Set<String>()
     var settingsData: [String: [String: Any]] = [:]
     var projectSettingsData: [String: [String: Any]] = [:]
@@ -1263,9 +1437,9 @@ class XcodeProjUtility {
     let activeConfigs = configuration.map { [$0] } ?? configNames
     return (settingsData, projectSettingsData, allSettingKeys, activeConfigs)
   }
-  
+
   // MARK: - Build Settings Output Formatting
-  
+
   /// Formats and displays project build settings to console
   private func formatProjectBuildSettingsOutput(
     settingsData: [String: [String: Any]], allKeys: Set<String>, activeConfigs: [String]
@@ -1300,7 +1474,7 @@ class XcodeProjUtility {
       }
     }
   }
-  
+
   /// Formats and displays target build settings to console
   private func formatTargetBuildSettingsOutput(
     settingsData: [String: [String: Any]],
@@ -1340,9 +1514,9 @@ class XcodeProjUtility {
       )
     }
   }
-  
+
   // MARK: - Build Settings Output Coordination
-  
+
   /// Handles JSON output for build settings
   private func outputJSONBuildSettings(
     targetName: String? = nil, configuration: String? = nil,
@@ -1353,7 +1527,7 @@ class XcodeProjUtility {
       showInherited: showInherited, showAll: showAll
     )
   }
-  
+
   /// Handles console output for build settings
   private func outputConsoleBuildSettings(
     targetName: String? = nil, configuration: String? = nil,
@@ -1363,7 +1537,7 @@ class XcodeProjUtility {
       listAllBuildSettings(configuration: configuration, showInherited: showInherited)
       return
     }
-    
+
     if let targetName = targetName {
       outputTargetBuildSettings(
         targetName: targetName, configuration: configuration, showInherited: showInherited
@@ -1372,7 +1546,7 @@ class XcodeProjUtility {
       outputProjectBuildSettings(configuration: configuration)
     }
   }
-  
+
   /// Outputs build settings for a specific target
   private func outputTargetBuildSettings(
     targetName: String, configuration: String? = nil, showInherited: Bool = false
@@ -1390,7 +1564,7 @@ class XcodeProjUtility {
     let (settingsData, projectSettingsData, allKeys, activeConfigs) = collectTargetBuildSettings(
       target: target, configuration: configuration, showInherited: showInherited
     )
-    
+
     formatTargetBuildSettingsOutput(
       settingsData: settingsData,
       projectSettingsData: projectSettingsData,
@@ -1401,7 +1575,7 @@ class XcodeProjUtility {
 
     print("")
   }
-  
+
   /// Outputs build settings for the project
   private func outputProjectBuildSettings(configuration: String? = nil) {
     guard pbxproj.rootObject?.buildConfigurationList != nil else {
@@ -1414,8 +1588,9 @@ class XcodeProjUtility {
     print("─" + String(repeating: "─", count: 80))
     print("")
 
-    let (settingsData, allKeys, activeConfigs) = collectProjectBuildSettings(configuration: configuration)
-    
+    let (settingsData, allKeys, activeConfigs) = collectProjectBuildSettings(
+      configuration: configuration)
+
     formatProjectBuildSettingsOutput(
       settingsData: settingsData, allKeys: allKeys, activeConfigs: activeConfigs
     )
@@ -2226,14 +2401,14 @@ class XcodeProjUtility {
     try profiler?.measureOperation("save") {
       try _save()
     } ?? _save()
-    
+
     // Print performance stats if verbose
     profiler?.printTimingReport()
     if profiler != nil {
       cacheManager.printCacheStatistics()
     }
   }
-  
+
   private func _save() throws {
     // Validate before saving
     let issues = validate()

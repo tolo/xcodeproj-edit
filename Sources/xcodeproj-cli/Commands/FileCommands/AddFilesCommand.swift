@@ -11,61 +11,93 @@ import XcodeProj
 /// Command for adding multiple files to specified groups and targets in batch
 struct AddFilesCommand: Command {
   static let commandName = "add-files"
-  
+
   static let description = "Add multiple files to specified groups and targets in batch"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
-    // Parse file:group pairs from positional arguments
-    var files: [(String, String)] = []
-    for arg in arguments.positional {
-      let parts = arg.split(separator: ":")
-      if parts.count == 2 {
-        files.append((String(parts[0]), String(parts[1])))
-      }
-    }
-    
-    guard !files.isEmpty else {
+    guard !arguments.positional.isEmpty else {
       throw ProjectError.invalidArguments(
-        "add-files requires: <file1:group1> [file2:group2] ... --targets <target1,target2>")
+        "add-files requires file paths. See usage below.")
     }
-    
+
     // Get required targets flag
     let targetsStr = try arguments.requireFlag(
-      "--targets", "-t", 
+      "--targets", "-t",
       error: "add-files requires --targets or -t flag"
     )
-    
+
     let targets = parseTargets(from: targetsStr)
-    
+
     // Validate targets exist
     try validateTargets(targets, in: utility)
-    
-    // Validate groups exist
-    for (_, group) in files {
+
+    // Check if we have file:group pairs or files with shared group
+    var files: [(String, String)] = []
+
+    // Check if any arguments contain colons (file:group format)
+    let hasColonFormat = arguments.positional.contains { $0.contains(":") }
+
+    if hasColonFormat {
+      // Parse file:group pairs format
+      for arg in arguments.positional {
+        let parts = arg.split(separator: ":")
+        if parts.count == 2 {
+          files.append((String(parts[0]), String(parts[1])))
+        } else {
+          throw ProjectError.invalidArguments(
+            "Invalid file:group format: '\(arg)'. Use 'file:group' or provide --group flag for all files."
+          )
+        }
+      }
+    } else {
+      // Multiple files with shared group format
+      let group = try arguments.requireFlag(
+        "--group", "-g",
+        error: "add-files requires --group or -g flag when not using file:group format"
+      )
+
+      // Validate group exists
       try validateGroup(group, in: utility)
+
+      // Create file:group pairs for all files
+      for filePath in arguments.positional {
+        files.append((filePath, group))
+      }
     }
-    
+
+    // Validate groups exist (for colon format)
+    if hasColonFormat {
+      for (_, group) in files {
+        try validateGroup(group, in: utility)
+      }
+    }
+
     // Execute the command
     try utility.addFiles(files, to: targets)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
+      add-files <files...> --group <group> --targets <target1,target2>
       add-files <file1:group1> [file2:group2] ... --targets <target1,target2>
         Add multiple files to specified groups and targets in batch
         
         Arguments:
-          <fileN:groupN>        File path paired with destination group (colon-separated)
+          <files...>            List of files to add (when using --group flag)
+          <fileN:groupN>        File path paired with destination group (colon-separated format)
+          --group, -g <group>   Group to add all files to (required for first format)
           --targets, -t <list>  Comma-separated list of target names
         
         Examples:
+          add-files File1.swift File2.swift --group Sources --targets MyApp,MyAppTests
           add-files Model.swift:Models View.swift:Views --targets MyApp,MyAppTests
-          add-files Helper.swift:Utils Config.swift:Config -t MyApp
+          add-files Helper.swift Utils.swift -g Utils -t MyApp
         
         Notes:
-          - Each file:group pair is processed independently
           - All files are added to all specified targets
           - Groups must exist before adding files
+          - Cannot mix colon format with --group flag
       """)
   }
 }
@@ -75,11 +107,12 @@ extension AddFilesCommand {
   private static func parseTargets(from targetsString: String) -> [String] {
     return BaseCommand.parseTargets(from: targetsString)
   }
-  
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
+
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
-  
+
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

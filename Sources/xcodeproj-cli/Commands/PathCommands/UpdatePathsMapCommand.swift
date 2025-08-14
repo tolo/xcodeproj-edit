@@ -11,9 +11,9 @@ import XcodeProj
 /// Command for updating file paths using a mapping of old to new paths
 struct UpdatePathsMapCommand: Command {
   static let commandName = "update-paths-map"
-  
+
   static let description = "Update file paths using a mapping of old to new paths"
-  
+
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Parse path mappings from positional arguments
     var mappings: [String: String] = [:]
@@ -23,19 +23,20 @@ struct UpdatePathsMapCommand: Command {
         mappings[String(parts[0])] = String(parts[1])
       }
     }
-    
+
     guard !mappings.isEmpty else {
       throw ProjectError.invalidArguments(
         "update-paths-map requires: <old1:new1> [old2:new2] ..."
       )
     }
-    
+
     // Execute the command
     utility.updateFilePaths(mappings)
   }
-  
+
   static func printUsage() {
-    print("""
+    print(
+      """
       update-paths-map <old1:new1> [old2:new2] ...
         Update file paths using a mapping of old to new paths
         
