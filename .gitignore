@@ -4,6 +4,7 @@
 # Swift
 .build/
 *.xcodeproj
+!Tests/xcodeproj-cliTests/TestResources/TestProject.xcodeproj
 Package.resolved
 
 # Cache
