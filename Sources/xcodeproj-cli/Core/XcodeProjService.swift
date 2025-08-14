@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Core service for manipulating Xcode project files
 @MainActor

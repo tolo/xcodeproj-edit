@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command handler type for dictionary-based registration
 typealias CommandHandler = @MainActor (ParsedArguments, XcodeProjUtility) throws -> Void

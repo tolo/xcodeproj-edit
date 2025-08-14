@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding a dependency relationship between targets
 

@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for removing Swift Package dependencies from the project
 

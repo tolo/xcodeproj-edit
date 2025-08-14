@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct DuplicateSchemeCommand: Command {
   static let commandName = "duplicate-scheme"

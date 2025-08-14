@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct SetTestParallelCommand: Command {
   static let commandName = "set-test-parallel"

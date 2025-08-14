@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct ListSchemesCommand: Command {
   static let commandName = "list-schemes"

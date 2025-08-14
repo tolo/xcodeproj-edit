@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct CreateSchemeCommand: Command {
   static let commandName = "create-scheme"

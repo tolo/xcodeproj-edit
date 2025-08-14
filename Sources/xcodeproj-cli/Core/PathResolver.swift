@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Handles path resolution and validation for Xcode project file references
 class PathResolver {

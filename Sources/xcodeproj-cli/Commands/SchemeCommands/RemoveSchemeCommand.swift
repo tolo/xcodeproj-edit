@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct RemoveSchemeCommand: Command {
   static let commandName = "remove-scheme"

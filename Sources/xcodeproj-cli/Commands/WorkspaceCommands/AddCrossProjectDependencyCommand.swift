@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct AddCrossProjectDependencyCommand: Command {
   static let commandName = "add-cross-project-dependency"

@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Validates Xcode project structure and provides cleanup functionality
 @MainActor

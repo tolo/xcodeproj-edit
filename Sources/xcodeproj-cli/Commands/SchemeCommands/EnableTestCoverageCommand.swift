@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct EnableTestCoverageCommand: Command {
   static let commandName = "enable-test-coverage"

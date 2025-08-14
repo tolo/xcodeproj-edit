@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct SetSchemeConfigCommand: Command {
   static let commandName = "set-scheme-config"

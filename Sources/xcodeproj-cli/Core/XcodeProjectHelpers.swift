@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Helper functions for working with Xcode project components
 struct XcodeProjectHelpers {

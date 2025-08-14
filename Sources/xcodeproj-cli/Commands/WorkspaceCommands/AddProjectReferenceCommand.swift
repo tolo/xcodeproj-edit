@@ -7,7 +7,7 @@
 
 import Foundation
 @preconcurrency import PathKit
-import XcodeProj
+@preconcurrency import XcodeProj
 
 struct AddProjectReferenceCommand: Command {
   static let commandName = "add-project-reference"
