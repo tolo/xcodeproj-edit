@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct AddProjectReferenceCommand: Command {
-  static var commandName = "add-project-reference"
+  static let commandName = "add-project-reference"
   static let description = "Add a reference to an external project"
 
   let projectPath: String

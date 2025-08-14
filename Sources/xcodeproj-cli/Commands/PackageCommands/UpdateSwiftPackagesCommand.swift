@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for updating Swift Package dependencies to their latest versions
+
 struct UpdateSwiftPackagesCommand: Command {
   static let commandName = "update-swift-packages"
 

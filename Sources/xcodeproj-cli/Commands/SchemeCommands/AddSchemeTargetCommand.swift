@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct AddSchemeTargetCommand: Command {
-  static var commandName = "add-scheme-target"
+  static let commandName = "add-scheme-target"
   static let description = "Add a target to a scheme's build action"
 
   let schemeName: String

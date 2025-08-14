@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct RemoveProjectFromWorkspaceCommand: Command {
-  static var commandName = "remove-project-from-workspace"
+  static let commandName = "remove-project-from-workspace"
   static let description = "Remove a project from a workspace"
 
   let workspaceName: String

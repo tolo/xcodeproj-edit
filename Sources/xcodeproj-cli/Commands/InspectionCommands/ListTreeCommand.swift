@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing the complete project structure as a tree
+
 struct ListTreeCommand: Command {
   static let commandName = "list-tree"
 

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding files from a filesystem folder to project group
+
 struct AddFolderCommand: Command {
   static let commandName = "add-folder"
 

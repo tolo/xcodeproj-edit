@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Registry for managing and executing commands
+@MainActor
 struct CommandRegistry {
 
   /// Execute a command by name with given arguments

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for removing groups and their contents from the project
+
 struct RemoveGroupCommand: Command {
   static let commandName = "remove-group"
 

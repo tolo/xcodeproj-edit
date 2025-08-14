@@ -20,6 +20,7 @@ protocol Command {
   static var isReadOnly: Bool { get }
 
   /// Execute the command with parsed arguments and utility
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws
 
   /// Print usage information for this specific command
@@ -32,6 +33,7 @@ extension Command {
 }
 
 /// Abstract base class providing common functionality for commands
+@MainActor
 class BaseCommand {
 
   /// Validate that required positional arguments are provided

@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct SetTestParallelCommand: Command {
-  static var commandName = "set-test-parallel"
+  static let commandName = "set-test-parallel"
   static let description = "Enable or disable test parallelization for a scheme"
 
   let schemeName: String

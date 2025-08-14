@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Service for managing Xcode workspaces
+@MainActor
 class WorkspaceManager {
   private let workingDirectory: Path
   private let transactionManager: TransactionManager?

@@ -7,9 +7,10 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+@MainActor
 class XcodeProjUtility {
   let xcodeproj: XcodeProj
   let projectPath: Path

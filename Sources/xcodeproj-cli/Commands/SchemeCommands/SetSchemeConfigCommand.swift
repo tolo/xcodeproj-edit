@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct SetSchemeConfigCommand: Command {
-  static var commandName = "set-scheme-config"
+  static let commandName = "set-scheme-config"
   static let description = "Set build configurations for scheme actions"
 
   let schemeName: String

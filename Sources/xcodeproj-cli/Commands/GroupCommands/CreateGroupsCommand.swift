@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for creating group hierarchies in the project
+
 struct CreateGroupsCommand: Command {
   static let commandName = "create-groups"
 

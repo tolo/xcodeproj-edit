@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct CreateSchemeCommand: Command {
-  static var commandName = "create-scheme"
+  static let commandName = "create-scheme"
   static let description = "Create a new scheme for a target"
 
   let schemeName: String

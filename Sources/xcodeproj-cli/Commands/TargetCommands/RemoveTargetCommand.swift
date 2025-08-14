@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for removing a target from the project
+
 struct RemoveTargetCommand: Command {
   static let commandName = "remove-target"
 

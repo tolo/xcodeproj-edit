@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct EnableTestCoverageCommand: Command {
-  static var commandName = "enable-test-coverage"
+  static let commandName = "enable-test-coverage"
   static let description = "Enable test coverage for a scheme"
 
   let schemeName: String

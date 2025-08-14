@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct ListSchemesCommand: Command {
-  static var commandName = "list-schemes"
+  static let commandName = "list-schemes"
   static let description = "List all schemes in the project"
 
   static let isReadOnly = true

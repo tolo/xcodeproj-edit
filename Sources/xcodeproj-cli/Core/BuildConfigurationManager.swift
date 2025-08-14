@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Service for managing build configurations and .xcconfig files
+@MainActor
 class BuildConfigurationManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path

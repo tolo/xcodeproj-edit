@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for removing a file from the project
+
 struct RemoveFileCommand: Command {
   static let commandName = "remove-file"
 

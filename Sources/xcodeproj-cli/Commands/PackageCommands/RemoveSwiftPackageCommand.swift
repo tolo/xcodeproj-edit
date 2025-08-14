@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for removing Swift Package dependencies from the project
+
 struct RemoveSwiftPackageCommand: Command {
   static let commandName = "remove-swift-package"
 

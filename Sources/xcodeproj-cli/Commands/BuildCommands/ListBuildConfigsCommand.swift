@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing build configurations for a target or the project
+
 struct ListBuildConfigsCommand: Command {
   static let commandName = "list-build-configs"
 

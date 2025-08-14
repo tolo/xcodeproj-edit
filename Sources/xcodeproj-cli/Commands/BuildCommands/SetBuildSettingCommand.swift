@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for setting build settings on specified targets
+
 struct SetBuildSettingCommand: Command {
   static let commandName = "set-build-setting"
 

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a synchronized folder that maintains sync with filesystem
+
 struct AddSyncFolderCommand: Command {
   static let commandName = "add-sync-folder"
 

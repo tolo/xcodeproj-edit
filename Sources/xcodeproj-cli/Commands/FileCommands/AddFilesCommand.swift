@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding multiple files to specified groups and targets in batch
+
 struct AddFilesCommand: Command {
   static let commandName = "add-files"
 

@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Helper functions for working with Xcode project components

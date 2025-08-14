@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing all targets in the project
+
 struct ListTargetsCommand: Command {
   static let commandName = "list-targets"
 

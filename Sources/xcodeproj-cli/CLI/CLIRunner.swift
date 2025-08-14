@@ -9,10 +9,11 @@ import Foundation
 import XcodeProj
 
 /// Main CLI runner that handles argument processing and command execution
+@MainActor
 struct CLIRunner {
 
   /// Run the CLI with the given command line arguments
-  static func run() throws {
+  static func run() async throws {
     let args = Array(CommandLine.arguments.dropFirst())
 
     // Handle global flags that should be checked early

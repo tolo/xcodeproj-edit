@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a single file to specified group and targets
+
 struct AddFileCommand: Command {
   static let commandName = "add-file"
 

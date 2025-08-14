@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct DuplicateSchemeCommand: Command {
-  static var commandName = "duplicate-scheme"
+  static let commandName = "duplicate-scheme"
   static let description = "Duplicate an existing scheme"
 
   let sourceName: String

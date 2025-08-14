@@ -8,6 +8,7 @@
 import Foundation
 import XcodeProj
 
+@MainActor
 class BuildPhaseManager {
   private let pbxproj: PBXProj
 

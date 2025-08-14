@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct CreateWorkspaceCommand: Command {
-  static var commandName = "create-workspace"
+  static let commandName = "create-workspace"
   static let description = "Create a new workspace"
 
   let workspaceName: String

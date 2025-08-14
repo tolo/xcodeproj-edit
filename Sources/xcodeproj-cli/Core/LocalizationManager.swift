@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Service for managing localization and variant groups
+@MainActor
 class LocalizationManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path

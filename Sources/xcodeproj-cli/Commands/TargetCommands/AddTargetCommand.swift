@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a new target to the project
+
 struct AddTargetCommand: Command {
   static let commandName = "add-target"
 

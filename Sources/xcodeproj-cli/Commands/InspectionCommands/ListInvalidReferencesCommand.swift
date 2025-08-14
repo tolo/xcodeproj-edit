@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing invalid file references in the project
+
 struct ListInvalidReferencesCommand: Command {
   static let commandName = "list-invalid-references"
 

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a build phase to a target
+
 struct AddBuildPhaseCommand: Command {
   static let commandName = "add-build-phase"
 

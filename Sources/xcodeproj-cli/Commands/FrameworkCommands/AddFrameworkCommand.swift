@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a framework to a target with optional embedding
+
 struct AddFrameworkCommand: Command {
   static let commandName = "add-framework"
 

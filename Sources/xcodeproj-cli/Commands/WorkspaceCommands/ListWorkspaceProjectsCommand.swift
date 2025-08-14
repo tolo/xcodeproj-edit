@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct ListWorkspaceProjectsCommand: Command {
-  static var commandName = "list-workspace-projects"
+  static let commandName = "list-workspace-projects"
   static let description = "List all projects in a workspace"
 
   static let isReadOnly = true

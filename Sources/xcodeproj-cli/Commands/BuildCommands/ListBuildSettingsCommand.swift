@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing build settings with various filtering options
+
 struct ListBuildSettingsCommand: Command {
   static let commandName = "list-build-settings"
 

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing Swift Package dependencies in the project
+
 struct ListSwiftPackagesCommand: Command {
   static let commandName = "list-swift-packages"
 

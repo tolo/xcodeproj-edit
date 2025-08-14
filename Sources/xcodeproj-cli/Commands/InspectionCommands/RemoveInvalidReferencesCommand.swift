@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for removing invalid file references from the project
+
 struct RemoveInvalidReferencesCommand: Command {
   static let commandName = "remove-invalid-references"
 

@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding a dependency relationship between targets
+
 struct AddDependencyCommand: Command {
   static let commandName = "add-dependency"
 

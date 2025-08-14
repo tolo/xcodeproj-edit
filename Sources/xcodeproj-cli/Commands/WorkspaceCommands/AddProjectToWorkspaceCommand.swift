@@ -6,11 +6,12 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
+
 struct AddProjectToWorkspaceCommand: Command {
-  static var commandName = "add-project-to-workspace"
+  static let commandName = "add-project-to-workspace"
   static let description = "Add a project to an existing workspace"
 
   let workspaceName: String

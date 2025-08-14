@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing groups in a tree structure
+
 struct ListGroupsCommand: Command {
   static let commandName = "list-groups"
 

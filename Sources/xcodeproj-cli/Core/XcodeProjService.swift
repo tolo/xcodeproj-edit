@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Core service for manipulating Xcode project files
+@MainActor
 class XcodeProjService {
   let xcodeproj: XcodeProj
   let projectPath: Path

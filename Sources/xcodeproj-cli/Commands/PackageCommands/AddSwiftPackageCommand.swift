@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for adding Swift Package dependencies to the project
+
 struct AddSwiftPackageCommand: Command {
   static let commandName = "add-swift-package"
 

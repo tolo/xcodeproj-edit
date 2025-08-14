@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for updating file paths using prefix replacement
+
 struct UpdatePathsCommand: Command {
   static let commandName = "update-paths"
 

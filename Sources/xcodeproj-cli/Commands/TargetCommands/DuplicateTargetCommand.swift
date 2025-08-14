@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for duplicating an existing target with optional bundle ID override
+
 struct DuplicateTargetCommand: Command {
   static let commandName = "duplicate-target"
 

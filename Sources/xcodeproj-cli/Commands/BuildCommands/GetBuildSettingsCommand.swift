@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for getting build settings from a target
+
 struct GetBuildSettingsCommand: Command {
   static let commandName = "get-build-settings"
 

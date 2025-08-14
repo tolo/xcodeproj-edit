@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Service for managing Xcode project schemes
+@MainActor
 class SchemeManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path

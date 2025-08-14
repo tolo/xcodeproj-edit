@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for listing files in the project or a specific group
+
 struct ListFilesCommand: Command {
   static let commandName = "list-files"
 

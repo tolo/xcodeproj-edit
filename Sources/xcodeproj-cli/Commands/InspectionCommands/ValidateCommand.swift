@@ -9,6 +9,7 @@ import Foundation
 import XcodeProj
 
 /// Command for validating project integrity
+
 struct ValidateCommand: Command {
   static let commandName = "validate"
 

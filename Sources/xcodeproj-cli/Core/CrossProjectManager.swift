@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 import XcodeProj
 
 /// Service for managing cross-project references and dependencies
+@MainActor
 class CrossProjectManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
