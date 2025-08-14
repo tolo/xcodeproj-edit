@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct RemoveSchemeCommand: Command {
   static let commandName = "remove-scheme"
   static let description = "Remove a scheme"
@@ -26,6 +25,7 @@ struct RemoveSchemeCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

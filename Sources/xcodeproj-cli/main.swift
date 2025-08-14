@@ -7,33 +7,13 @@
 
 import Foundation
 
-// Run the CLI synchronously on the main thread
-@MainActor
-func runCLI() throws {
-  // Since CLIRunner.run() is async, we need to run it in a Task
-  let semaphore = DispatchSemaphore(value: 0)
-  var error: Error?
-  
-  Task { @MainActor in
-    do {
-      try await CLIRunner.run()
-    } catch let e {
-      error = e
-    }
-    semaphore.signal()
+// Run the CLI directly without @main attribute
+// This ensures everything runs on the MainActor
+MainActor.assumeIsolated {
+  do {
+    try CLIRunner.run()
+  } catch {
+    print("❌ Error: \(error)")
+    exit(1)
   }
-  
-  semaphore.wait()
-  
-  if let error = error {
-    throw error
-  }
-}
-
-// Main entry point
-do {
-  try runCLI()
-} catch {
-  print("❌ Error: \(error)")
-  exit(1)
 }

@@ -53,12 +53,14 @@ struct RemoveTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveTargetCommand {
+  @MainActor
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

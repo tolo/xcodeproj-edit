@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct EnableTestCoverageCommand: Command {
   static let commandName = "enable-test-coverage"
   static let description = "Enable test coverage for a scheme"
@@ -37,6 +36,7 @@ struct EnableTestCoverageCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

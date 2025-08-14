@@ -50,7 +50,7 @@ class XcodeProjService {
       if let cachedGroup = self.cacheManager.getGroup(path) {
         return cachedGroup
       }
-      
+
       // If not in cache, try to find it
       do {
         let foundGroup = try self.findGroupAtPath(path)

@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct AddSchemeTargetCommand: Command {
   static let commandName = "add-scheme-target"
   static let description = "Add a target to a scheme's build action"
@@ -40,6 +39,7 @@ struct AddSchemeTargetCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

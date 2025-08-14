@@ -13,7 +13,7 @@ import XcodeProj
 struct CLIRunner {
 
   /// Run the CLI with the given command line arguments
-  static func run() async throws {
+  static func run() throws {
     let args = Array(CommandLine.arguments.dropFirst())
 
     // Handle global flags that should be checked early
@@ -292,7 +292,9 @@ struct CLIRunner {
     case "get-build-settings":
       return ["--targets", "--configs"]
     case "list-build-settings":
-      return ["--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a"]
+      return [
+        "--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a",
+      ]
     case "add-build-phase":
       return ["--target", "-t", "--script", "-s"]
     case "list-build-configs":

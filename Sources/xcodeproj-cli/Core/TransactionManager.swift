@@ -72,8 +72,14 @@ class TransactionManager {
 
   /// Clean up any leftover transaction files (called on deinit)
   nonisolated func cleanup() {
-    // Note: Can't access transactionBackupPath directly from nonisolated context
-    // This is okay since deinit means we're done with the transaction anyway
+    // Store the backup path before deinitialization to clean it up safely
+    Task { @MainActor [weak self] in
+      guard let self = self, let backupPath = self.transactionBackupPath else { return }
+      if FileManager.default.fileExists(atPath: backupPath.string) {
+        try? FileManager.default.removeItem(atPath: backupPath.string)
+        print("🧹 Cleaned up abandoned transaction backup")
+      }
+    }
   }
 
   deinit {

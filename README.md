@@ -65,6 +65,7 @@ The tool's comprehensive feature set was inspired by [xcodeproj-mcp-server](http
 
 ### Prerequisites
 - macOS 10.15+ (Catalina or later)
+- Swift 6.0+ (for building from source)
 - No additional dependencies required
 
 ### Installation
@@ -114,6 +115,9 @@ chmod +x /usr/local/bin/xcodeproj-cli
 
 #### Build from Source
 For development or custom builds:
+
+**Requirements**: Swift 6.0+ toolchain
+
 ```bash
 git clone https://github.com/tolo/xcodeproj-cli.git
 cd xcodeproj-cli

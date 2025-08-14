@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct ListSchemesCommand: Command {
   static let commandName = "list-schemes"
   static let description = "List all schemes in the project"
@@ -35,6 +34,7 @@ struct ListSchemesCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

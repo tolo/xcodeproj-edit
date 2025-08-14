@@ -22,7 +22,7 @@ struct CreateGroupsCommand: Command {
     }
 
     // Create all specified groups
-    try utility.createGroups(arguments.positional)
+    utility.createGroups(arguments.positional)
 
     // Save changes
     try utility.save()

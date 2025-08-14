@@ -243,7 +243,7 @@ final class PerformanceProfiler {
 private final class GlobalProfilerStorage {
   static var shared = GlobalProfilerStorage()
   var profiler: PerformanceProfiler?
-  
+
   private init() {}
 }
 

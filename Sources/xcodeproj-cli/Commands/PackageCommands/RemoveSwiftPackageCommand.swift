@@ -49,6 +49,7 @@ struct RemoveSwiftPackageCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveSwiftPackageCommand {
+  @MainActor
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

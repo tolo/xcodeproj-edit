@@ -50,6 +50,7 @@ struct RemoveFileCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveFileCommand {
+  @MainActor
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

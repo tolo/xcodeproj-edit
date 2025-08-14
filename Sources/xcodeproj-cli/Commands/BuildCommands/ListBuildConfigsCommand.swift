@@ -46,6 +46,7 @@ struct ListBuildConfigsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension ListBuildConfigsCommand {
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

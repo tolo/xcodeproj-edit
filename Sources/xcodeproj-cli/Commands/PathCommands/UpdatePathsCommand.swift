@@ -54,6 +54,7 @@ struct UpdatePathsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension UpdatePathsCommand {
+  @MainActor
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

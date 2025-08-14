@@ -81,6 +81,7 @@ struct AddTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddTargetCommand {
+  @MainActor
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

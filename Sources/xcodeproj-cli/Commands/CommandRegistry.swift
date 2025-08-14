@@ -171,27 +171,27 @@ struct CommandRegistry {
     switch command {
     // Inspection Commands
     case ValidateCommand.commandName,
-         ListFilesCommand.commandName,
-         ListTreeCommand.commandName,
-         ListInvalidReferencesCommand.commandName:
+      ListFilesCommand.commandName,
+      ListTreeCommand.commandName,
+      ListInvalidReferencesCommand.commandName:
       return true
-    
+
     // List Commands
     case ListTargetsCommand.commandName,
-         ListGroupsCommand.commandName,
-         ListBuildConfigsCommand.commandName,
-         ListBuildSettingsCommand.commandName,
-         GetBuildSettingsCommand.commandName,
-         ListSwiftPackagesCommand.commandName,
-         ListSchemesCommand.commandName,
-         "list-workspace-projects":
+      ListGroupsCommand.commandName,
+      ListBuildConfigsCommand.commandName,
+      ListBuildSettingsCommand.commandName,
+      GetBuildSettingsCommand.commandName,
+      ListSwiftPackagesCommand.commandName,
+      ListSchemesCommand.commandName,
+      "list-workspace-projects":
       return true
-      
+
     default:
       return false
     }
   }
-  
+
   /// Get list of all available commands
   static func availableCommands() -> [String] {
     return [

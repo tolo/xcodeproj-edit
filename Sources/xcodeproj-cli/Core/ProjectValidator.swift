@@ -10,6 +10,7 @@ import Foundation
 import XcodeProj
 
 /// Validates Xcode project structure and provides cleanup functionality
+@MainActor
 class ProjectValidator {
   private let pbxproj: PBXProj
   private let projectPath: Path

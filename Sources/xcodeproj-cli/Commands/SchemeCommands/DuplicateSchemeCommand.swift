@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct DuplicateSchemeCommand: Command {
   static let commandName = "duplicate-scheme"
   static let description = "Duplicate an existing scheme"
@@ -28,6 +27,7 @@ struct DuplicateSchemeCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

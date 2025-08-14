@@ -17,11 +17,23 @@ xcodeproj-cli is a powerful command-line utility for programmatically manipulati
 
 ## Key Technologies
 
-- **Swift 5.0+** - Core implementation language
+- **Swift 6.0+** - Core implementation language (migrated from Swift 5.0+)
 - **Swift Package Manager** - Dependency management and build system
-- **XcodeProj Library** (tuist/XcodeProj v9.4.3+) - Core .xcodeproj manipulation
+- **XcodeProj Library** (tuist/XcodeProj v9.5.0+) - Core .xcodeproj manipulation
 - **PathKit** - Swift path manipulation library
 - **macOS 10.15+** - Required platform
+
+## Swift 6 Migration Status
+
+The project has been **successfully migrated to Swift 6** with the following key changes:
+- ✅ **Swift Tools Version**: Upgraded to 6.0 in Package.swift
+- ✅ **Concurrency Safety**: Applied `@MainActor` isolation to command classes for thread safety
+- ✅ **Sendable Conformance**: Data models implement `Sendable` for safe cross-actor communication
+- ✅ **Dependency Compatibility**: Uses `@preconcurrency` imports for PathKit until Swift 6 adoption
+- ✅ **Build System**: CI/CD updated to Swift 6.0, universal binary build working
+- ✅ **Security**: All security tests pass, no new vulnerabilities introduced
+
+**Migration Approach**: Conservative `@MainActor` adoption ensures thread safety for CLI tool execution while maintaining existing functionality and performance characteristics.
 
 ## Quick Reference
 

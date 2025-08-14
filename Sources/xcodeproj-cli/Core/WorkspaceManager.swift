@@ -54,12 +54,13 @@ class WorkspaceManager {
   func createWorkspace(name: String) throws -> XCWorkspace {
     // Validate user input for security
     let validatedWorkspaceName = try SecurityUtils.validateString(name)
-    
+
     let workspacePath = workingDirectory + "\(validatedWorkspaceName).xcworkspace"
 
     // Check if workspace already exists
     if workspacePath.exists {
-      throw ProjectError.operationFailed("Workspace '\(validatedWorkspaceName)' already exists at \(workspacePath)")
+      throw ProjectError.operationFailed(
+        "Workspace '\(validatedWorkspaceName)' already exists at \(workspacePath)")
     }
 
     // Create workspace with self-reference
@@ -174,7 +175,7 @@ class WorkspaceManager {
   func listWorkspaceProjects(workspaceName: String) throws -> [String] {
     // Validate user input for security
     let validatedWorkspaceName = try SecurityUtils.validateString(workspaceName)
-    
+
     let workspacePath = findWorkspace(name: validatedWorkspaceName)
 
     guard workspacePath.exists else {
@@ -218,7 +219,7 @@ class WorkspaceManager {
     // Validate user inputs for security
     let validatedExternalProjectPath = try SecurityUtils.validatePath(externalProjectPath)
     let validatedGroupPath = try groupPath.map { try SecurityUtils.validateString($0) }
-    
+
     let pbxproj = xcodeproj.pbxproj
 
     // Find or create the group
@@ -271,7 +272,7 @@ class WorkspaceManager {
     let validatedTargetName = try SecurityUtils.validateString(targetName)
     let validatedExternalProjectPath = try SecurityUtils.validatePath(externalProjectPath)
     let validatedExternalTargetName = try SecurityUtils.validateString(externalTargetName)
-    
+
     let pbxproj = xcodeproj.pbxproj
 
     // Find the target

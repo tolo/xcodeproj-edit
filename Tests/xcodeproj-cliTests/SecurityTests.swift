@@ -3,11 +3,13 @@ import Foundation
 
 final class SecurityTests: XCTestCase {
     
-    static var binaryPath: URL!
+    static var binaryPath: URL {
+        return productsDirectory.appendingPathComponent("xcodeproj-cli")
+    }
     
     override class func setUp() {
         super.setUp()
-        binaryPath = productsDirectory.appendingPathComponent("xcodeproj-cli")
+        // Binary path is now computed, no need to set it
     }
     
     // MARK: - Path Traversal Tests

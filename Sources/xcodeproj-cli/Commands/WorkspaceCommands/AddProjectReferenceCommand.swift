@@ -9,7 +9,6 @@ import Foundation
 @preconcurrency import PathKit
 import XcodeProj
 
-
 struct AddProjectReferenceCommand: Command {
   static let commandName = "add-project-reference"
   static let description = "Add a reference to an external project"
@@ -28,6 +27,7 @@ struct AddProjectReferenceCommand: Command {
     self.verbose = arguments.boolFlags.contains("verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let crossProjectManager = CrossProjectManager(xcodeproj: xcodeproj, projectPath: projectPath)
 
@@ -67,6 +67,7 @@ struct AddProjectReferenceCommand: Command {
       """)
   }
 
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let cmd = try AddProjectReferenceCommand(arguments: arguments)
     try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
