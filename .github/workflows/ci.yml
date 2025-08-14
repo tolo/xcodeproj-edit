@@ -17,13 +17,28 @@ jobs:
       - name: Select Xcode 16
         run: |
           # List available Xcode versions for debugging
+          echo "Available Xcode versions:"
           ls /Applications | grep Xcode || true
-          # Select Xcode 16 (required for Swift 6)
-          # macOS-15 runners should have Xcode 16
-          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || \
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          
+          # Find and select the latest Xcode 16.x version (e.g., 16.0, 16.1, 16.4, etc.)
+          # sort -V does version sorting, so 16.4 > 16.1 > 16.0
+          XCODE_16=$(ls /Applications | grep -E "Xcode_16\.[0-9]+\.app" | sort -V | tail -n1)
+          
+          if [ -n "$XCODE_16" ]; then
+            echo "Selecting $XCODE_16"
+            sudo xcode-select -s /Applications/$XCODE_16/Contents/Developer
+          elif [ -d "/Applications/Xcode.app" ]; then
+            echo "No Xcode 16.x found, using default Xcode.app"
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          else
+            echo "Error: No suitable Xcode installation found"
+            exit 1
+          fi
+          
           # Verify selected version
+          echo "Selected Xcode version:"
           xcodebuild -version
+          echo "Swift version:"
           swift --version
       
       - name: Setup Swift
