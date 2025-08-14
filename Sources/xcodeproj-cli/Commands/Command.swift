@@ -15,12 +15,20 @@ protocol Command {
 
   /// Brief description of what the command does
   static var description: String { get }
+  
+  /// Indicates if this is a read-only command that doesn't modify the project
+  static var isReadOnly: Bool { get }
 
   /// Execute the command with parsed arguments and utility
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws
 
   /// Print usage information for this specific command
   static func printUsage()
+}
+
+// Default implementation for isReadOnly (most commands modify the project)
+extension Command {
+  static var isReadOnly: Bool { false }
 }
 
 /// Abstract base class providing common functionality for commands

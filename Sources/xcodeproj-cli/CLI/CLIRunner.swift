@@ -83,13 +83,14 @@ struct CLIRunner {
       // Execute via command registry
       try CommandRegistry.execute(command: actualCommand, arguments: parsedArgs, utility: utility)
 
-      // Save changes (unless dry run or command exited)
-      if !dryRun {
+      // Save changes (unless dry run or read-only command)
+      if !dryRun && !CommandRegistry.isReadOnlyCommand(actualCommand) {
         try utility.save()
         print("✅ Operation completed successfully")
-      } else {
+      } else if dryRun {
         print("🔍 DRY RUN - Changes not saved")
       }
+      // For read-only commands, don't print anything about saving
     } else {
       // Fall back to legacy system for unimplemented commands
       try executeLegacyCommand(

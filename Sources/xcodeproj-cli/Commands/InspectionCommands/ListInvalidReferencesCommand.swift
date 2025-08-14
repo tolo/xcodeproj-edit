@@ -14,6 +14,7 @@ struct ListInvalidReferencesCommand: Command {
 
   static let description = "List invalid file references in the project"
 
+  static let isReadOnly = true
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Execute the command
     utility.listInvalidReferences()

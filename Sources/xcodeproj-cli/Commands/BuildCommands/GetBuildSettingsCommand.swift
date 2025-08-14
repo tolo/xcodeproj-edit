@@ -14,6 +14,7 @@ struct GetBuildSettingsCommand: Command {
 
   static let description = "Get build settings from a target"
 
+  static let isReadOnly = true
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let targetName: String
     let configuration = arguments.getFlag("--config", "-c") ?? arguments.getFlag("--configuration")

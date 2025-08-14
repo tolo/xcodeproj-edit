@@ -165,6 +165,32 @@ struct CommandRegistry {
     }
   }
 
+  /// Check if a command is read-only (doesn't modify the project)
+  static func isReadOnlyCommand(_ command: String) -> Bool {
+    switch command {
+    // Inspection Commands
+    case ValidateCommand.commandName,
+         ListFilesCommand.commandName,
+         ListTreeCommand.commandName,
+         ListInvalidReferencesCommand.commandName:
+      return true
+    
+    // List Commands
+    case ListTargetsCommand.commandName,
+         ListGroupsCommand.commandName,
+         ListBuildConfigsCommand.commandName,
+         ListBuildSettingsCommand.commandName,
+         GetBuildSettingsCommand.commandName,
+         ListSwiftPackagesCommand.commandName,
+         ListSchemesCommand.commandName,
+         "list-workspace-projects":
+      return true
+      
+    default:
+      return false
+    }
+  }
+  
   /// Get list of all available commands
   static func availableCommands() -> [String] {
     return [
