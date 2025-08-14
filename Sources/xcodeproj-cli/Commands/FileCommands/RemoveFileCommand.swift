@@ -24,26 +24,40 @@ struct RemoveFileCommand: Command {
     )
 
     let filePath = arguments.positional[0]
-
-    // Execute the command
-    try utility.removeFile(filePath)
+    
+    // Check for optional flags
+    let targetsStr = arguments.getFlag("--targets", "-t")
+    
+    if let targetsStr = targetsStr {
+      // Mode: Remove from specific targets only
+      let targets = parseTargets(from: targetsStr)
+      try validateTargets(targets, in: utility)
+      try utility.removeFileFromTargets(path: filePath, targets: targets)
+    } else {
+      // Mode: Remove from entire project
+      try utility.removeFile(filePath)
+    }
   }
 
   static func printUsage() {
     print(
       """
-      remove-file <file-path>
-        Remove a file from the project
+      remove-file <file-path> [--targets <target1,target2>]
+        Remove a file from the project or from specific targets only
         
         Arguments:
-          <file-path>  Path or name of the file to remove from the project
+          <file-path>           Path or name of the file to remove
+          --targets, -t <list>  Optional: Remove from specific targets only
         
         Examples:
           remove-file Sources/OldFile.swift
           remove-file Helper.swift
+          remove-file Sources/Model.swift --targets MyAppTests
+          remove-file Utils.swift -t MyApp,MyFramework
           
-        Note: This only removes the file reference from the project,
-              it does not delete the file from the filesystem.
+        Note: Without --targets, removes the file reference from the entire project.
+              With --targets, only removes from specified targets' build phases.
+              This never deletes the actual file from the filesystem.
       """)
   }
 }
@@ -55,5 +69,15 @@ extension RemoveFileCommand {
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
+  }
+  
+  private static func parseTargets(from targetsString: String) -> [String] {
+    return BaseCommand.parseTargets(from: targetsString)
+  }
+
+  @MainActor
+  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
+  {
+    try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

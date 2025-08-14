@@ -13,6 +13,10 @@ struct ParsedArguments: Sendable {
   var flags: [String: String] = [:]
   var boolFlags: Set<String> = []
 
+  func flag(_ names: String...) -> String? {
+    return getFlagFromArray(names)
+  }
+  
   func getFlag(_ names: String...) -> String? {
     return getFlagFromArray(names)
   }

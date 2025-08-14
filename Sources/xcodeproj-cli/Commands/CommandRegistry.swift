@@ -35,6 +35,8 @@ struct CommandRegistry {
     AddDependencyCommand.commandName: AddDependencyCommand.execute,
     ListTargetsCommand.commandName: ListTargetsCommand.execute,
     RemoveTargetCommand.commandName: RemoveTargetCommand.execute,
+    AddTargetFileCommand.commandName: AddTargetFileCommand.execute,
+    RemoveTargetFileCommand.commandName: RemoveTargetFileCommand.execute,
 
     // Group Commands
     CreateGroupsCommand.commandName: CreateGroupsCommand.execute,
@@ -122,6 +124,8 @@ struct CommandRegistry {
     AddDependencyCommand.commandName: AddDependencyCommand.printUsage,
     ListTargetsCommand.commandName: ListTargetsCommand.printUsage,
     RemoveTargetCommand.commandName: RemoveTargetCommand.printUsage,
+    AddTargetFileCommand.commandName: AddTargetFileCommand.printUsage,
+    RemoveTargetFileCommand.commandName: RemoveTargetFileCommand.printUsage,
 
     // Group Commands
     CreateGroupsCommand.commandName: CreateGroupsCommand.printUsage,

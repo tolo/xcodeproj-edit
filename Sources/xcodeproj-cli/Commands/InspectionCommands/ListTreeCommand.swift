@@ -18,17 +18,28 @@ struct ListTreeCommand: Command {
   static let isReadOnly = true
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
-    utility.listProjectTree()
+    let targetName = arguments.getFlag("--target", "-t")
+    
+    if let targetName = targetName {
+      try utility.listTargetTree(targetName: targetName)
+    } else {
+      utility.listProjectTree()
+    }
   }
 
   static func printUsage() {
     print(
       """
-      list-tree
+      list-tree [--target <target-name>]
         List the complete project structure as a tree
         
+        Arguments:
+          --target, -t <name>   Optional: show tree for files in specified target only
+        
         Examples:
-          list-tree
+          list-tree                  # Show complete project tree
+          list-tree --target MyApp   # Show tree of files in MyApp target
+          list-tree -t MyAppTests    # Show tree of files in MyAppTests target
         
         Note: Shows complete project structure including files and groups
       """)

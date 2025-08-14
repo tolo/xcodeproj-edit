@@ -1165,6 +1165,91 @@ class XcodeProjUtility {
 
     print("✅ Batch complete: \(addedFiles) added, \(skippedFiles) skipped")
   }
+  
+  // MARK: - Target-Only File Operations
+  
+  func addFileToTargetsOnly(path: String, targets: [String]) throws {
+    // Find the file reference - it must already exist in the project
+    let fileName = (path as NSString).lastPathComponent
+    
+    guard let fileRef = pbxproj.fileReferences.first(where: {
+      // Check exact path match
+      $0.path == path
+        // Check name match
+        || $0.name == path
+        // Check filename match (just the last component)
+        || $0.path == fileName || $0.name == fileName
+        // Check if the path ends with the provided path (for partial paths like "Sources/File.swift")
+        || ($0.path?.hasSuffix(path) ?? false)
+    }) else {
+      throw ProjectError.operationFailed("File not found in project: \(path). File must already exist in the project to add to targets.")
+    }
+    
+    // Add to targets using BuildPhaseManager
+    buildPhaseManager.addFileToBuildPhases(
+      fileReference: fileRef,
+      targets: targets,
+      isCompilable: isCompilableFile(path)
+    )
+    
+    print("✅ Added \(fileName) to targets: \(targets.joined(separator: ", "))")
+  }
+  
+  func removeFileFromTargets(path: String, targets: [String]) throws {
+    // Find the file reference
+    let fileName = (path as NSString).lastPathComponent
+    
+    guard let fileRef = pbxproj.fileReferences.first(where: {
+      // Check exact path match
+      $0.path == path
+        // Check name match
+        || $0.name == path
+        // Check filename match (just the last component)
+        || $0.path == fileName || $0.name == fileName
+        // Check if the path ends with the provided path (for partial paths like "Sources/File.swift")
+        || ($0.path?.hasSuffix(path) ?? false)
+    }) else {
+      throw ProjectError.operationFailed("File not found in project: \(path)")
+    }
+    
+    // Remove from specified targets only
+    for targetName in targets {
+      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+        print("⚠️  Target '\(targetName)' not found")
+        continue
+      }
+      
+      // Remove from all build phases of this target
+      for buildPhase in target.buildPhases {
+        switch buildPhase {
+        case let sourcesBuildPhase as PBXSourcesBuildPhase:
+          if let buildFile = sourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+            sourcesBuildPhase.files?.removeAll { $0 === buildFile }
+            pbxproj.delete(object: buildFile)
+          }
+        case let resourcesBuildPhase as PBXResourcesBuildPhase:
+          if let buildFile = resourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+            resourcesBuildPhase.files?.removeAll { $0 === buildFile }
+            pbxproj.delete(object: buildFile)
+          }
+        case let frameworksBuildPhase as PBXFrameworksBuildPhase:
+          if let buildFile = frameworksBuildPhase.files?.first(where: { $0.file === fileRef }) {
+            frameworksBuildPhase.files?.removeAll { $0 === buildFile }
+            pbxproj.delete(object: buildFile)
+          }
+        case let copyFilesBuildPhase as PBXCopyFilesBuildPhase:
+          if let buildFile = copyFilesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+            copyFilesBuildPhase.files?.removeAll { $0 === buildFile }
+            pbxproj.delete(object: buildFile)
+          }
+        default:
+          continue
+        }
+      }
+    }
+    
+    print("✅ Removed \(fileName) from targets: \(targets.joined(separator: ", "))")
+  }
 
   // MARK: - Path Updates
   func updateFilePaths(_ mappings: [String: String]) {
@@ -2275,6 +2360,118 @@ class XcodeProjUtility {
     } else {
       print("❌ No project structure found")
     }
+  }
+  
+  func listTargetTree(targetName: String) throws {
+    guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+      throw ProjectError.targetNotFound(targetName)
+    }
+    
+    print("📁 Files in target '\(targetName)':")
+    
+    // Collect all files from target's build phases
+    var fileReferences: Set<PBXFileReference> = []
+    var fileToGroup: [PBXFileReference: PBXGroup] = [:]
+    
+    // Collect files from all build phases
+    for buildPhase in target.buildPhases {
+      var phaseFiles: [PBXBuildFile] = []
+      
+      switch buildPhase {
+      case let sourcesBuildPhase as PBXSourcesBuildPhase:
+        phaseFiles = sourcesBuildPhase.files ?? []
+      case let resourcesBuildPhase as PBXResourcesBuildPhase:
+        phaseFiles = resourcesBuildPhase.files ?? []
+      case let frameworksBuildPhase as PBXFrameworksBuildPhase:
+        phaseFiles = frameworksBuildPhase.files ?? []
+      case let copyFilesBuildPhase as PBXCopyFilesBuildPhase:
+        phaseFiles = copyFilesBuildPhase.files ?? []
+      default:
+        continue
+      }
+      
+      for buildFile in phaseFiles {
+        if let fileRef = buildFile.file as? PBXFileReference {
+          fileReferences.insert(fileRef)
+        }
+      }
+    }
+    
+    // Find parent groups for files
+    if let rootGroup = pbxproj.rootObject?.mainGroup {
+      findParentGroups(for: Array(fileReferences), in: rootGroup, parentGroups: &fileToGroup)
+    }
+    
+    // Build tree structure
+    var tree: [String: [PBXFileReference]] = [:]
+    for fileRef in fileReferences {
+      let groupPath = buildGroupPath(for: fileRef, fileToGroup: fileToGroup)
+      if tree[groupPath] == nil {
+        tree[groupPath] = []
+      }
+      tree[groupPath]?.append(fileRef)
+    }
+    
+    // Display tree
+    let sortedPaths = tree.keys.sorted()
+    for path in sortedPaths {
+      if !path.isEmpty {
+        print("📁 \(path)")
+      }
+      if let files = tree[path] {
+        let sortedFiles = files.sorted { 
+          ($0.path ?? $0.name ?? "") < ($1.path ?? $1.name ?? "") 
+        }
+        for file in sortedFiles {
+          let prefix = path.isEmpty ? "" : "  "
+          print("\(prefix)  - \(file.path ?? file.name ?? "unknown")")
+        }
+      }
+    }
+    
+    if fileReferences.isEmpty {
+      print("  (no files)")
+    } else {
+      print("\nTotal: \(fileReferences.count) file(s)")
+    }
+  }
+  
+  private func findParentGroups(for files: [PBXFileReference], in group: PBXGroup, parentGroups: inout [PBXFileReference: PBXGroup], currentPath: String = "") {
+    let groupPath = currentPath.isEmpty ? (group.name ?? group.path ?? "") : currentPath
+    
+    for child in group.children {
+      if let fileRef = child as? PBXFileReference, files.contains(fileRef) {
+        parentGroups[fileRef] = group
+      } else if let subgroup = child as? PBXGroup {
+        let subPath = groupPath.isEmpty ? (subgroup.name ?? subgroup.path ?? "") : "\(groupPath)/\(subgroup.name ?? subgroup.path ?? "")"
+        findParentGroups(for: files, in: subgroup, parentGroups: &parentGroups, currentPath: subPath)
+      }
+    }
+  }
+  
+  private func buildGroupPath(for file: PBXFileReference, fileToGroup: [PBXFileReference: PBXGroup]) -> String {
+    var path: [String] = []
+    var currentGroup = fileToGroup[file]
+    
+    while let group = currentGroup {
+      if let name = group.name ?? group.path {
+        path.insert(name, at: 0)
+      }
+      // Find parent group
+      currentGroup = nil
+      for potentialParent in pbxproj.groups {
+        if potentialParent.children.contains(where: { $0 === group }) {
+          currentGroup = potentialParent
+          break
+        }
+      }
+      // Don't include the root group
+      if currentGroup === pbxproj.rootObject?.mainGroup {
+        break
+      }
+    }
+    
+    return path.joined(separator: "/")
   }
 
   func listGroupsTree() {
