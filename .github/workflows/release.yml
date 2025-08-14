@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: macos-14  # Use macOS 14 (Sonoma) runner which has Xcode 15/16
+    runs-on: macos-15  # Use macOS 15 (Sequoia) runner which should have Xcode 16
     
     permissions:
       contents: write  # Required for creating releases
@@ -16,19 +16,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Select Xcode
+      - name: Select Xcode 16
         run: |
           # List available Xcode versions
           ls /Applications | grep Xcode || true
-          # Try to select Xcode 16, fall back to 15.4 which has Swift 6 support
-          if [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-          else
-            # Use whatever is the latest available
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          fi
+          # Select Xcode 16 (required for Swift 6)
+          # macOS-15 runners should have Xcode 16
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || \
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           # Verify selected version
           xcodebuild -version
           swift --version
