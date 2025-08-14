@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Main CLI runner that handles argument processing and command execution
+@MainActor
 struct CLIRunner {
 
   /// Run the CLI with the given command line arguments
@@ -291,7 +292,9 @@ struct CLIRunner {
     case "get-build-settings":
       return ["--targets", "--configs"]
     case "list-build-settings":
-      return ["--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a"]
+      return [
+        "--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a",
+      ]
     case "add-build-phase":
       return ["--target", "-t", "--script", "-s"]
     case "list-build-configs":

@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Manages performance caches for Xcode project operations
+@MainActor
 class CacheManager {
   // MARK: - Cache Storage
 

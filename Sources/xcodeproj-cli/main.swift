@@ -7,10 +7,13 @@
 
 import Foundation
 
-// MARK: - Main Entry Point
-do {
-  try CLIRunner.run()
-} catch {
-  print("❌ Error: \(error)")
-  exit(1)
+// Run the CLI directly without @main attribute
+// This ensures everything runs on the MainActor
+MainActor.assumeIsolated {
+  do {
+    try CLIRunner.run()
+  } catch {
+    print("❌ Error: \(error)")
+    exit(1)
+  }
 }

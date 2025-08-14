@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for updating file paths using prefix replacement
+
 struct UpdatePathsCommand: Command {
   static let commandName = "update-paths"
 
@@ -53,6 +54,7 @@ struct UpdatePathsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension UpdatePathsCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

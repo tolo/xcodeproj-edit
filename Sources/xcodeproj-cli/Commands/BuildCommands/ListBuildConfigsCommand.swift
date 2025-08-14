@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for listing build configurations for a target or the project
+
 struct ListBuildConfigsCommand: Command {
   static let commandName = "list-build-configs"
 
@@ -45,6 +46,8 @@ struct ListBuildConfigsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension ListBuildConfigsCommand {
+
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

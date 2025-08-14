@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct SetTestParallelCommand: Command {
-  static var commandName = "set-test-parallel"
+  static let commandName = "set-test-parallel"
   static let description = "Enable or disable test parallelization for a scheme"
 
   let schemeName: String
@@ -40,6 +40,7 @@ struct SetTestParallelCommand: Command {
     self.verbose = arguments.boolFlags.contains("--verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

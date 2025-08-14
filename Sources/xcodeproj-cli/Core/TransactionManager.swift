@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import PathKit
+@preconcurrency import PathKit
 
 /// Manages project transaction state for rollback capability
+@MainActor
 class TransactionManager {
   private let projectPath: Path
   private var transactionBackupPath: Path?
@@ -70,12 +71,14 @@ class TransactionManager {
   }
 
   /// Clean up any leftover transaction files (called on deinit)
-  func cleanup() {
-    if let backupPath = transactionBackupPath,
-      FileManager.default.fileExists(atPath: backupPath.string)
-    {
-      try? FileManager.default.removeItem(atPath: backupPath.string)
-      transactionBackupPath = nil
+  nonisolated func cleanup() {
+    // Store the backup path before deinitialization to clean it up safely
+    Task { @MainActor [weak self] in
+      guard let self = self, let backupPath = self.transactionBackupPath else { return }
+      if FileManager.default.fileExists(atPath: backupPath.string) {
+        try? FileManager.default.removeItem(atPath: backupPath.string)
+        print("🧹 Cleaned up abandoned transaction backup")
+      }
     }
   }
 

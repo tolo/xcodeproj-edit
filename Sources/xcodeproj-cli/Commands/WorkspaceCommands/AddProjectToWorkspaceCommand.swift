@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct AddProjectToWorkspaceCommand: Command {
-  static var commandName = "add-project-to-workspace"
+  static let commandName = "add-project-to-workspace"
   static let description = "Add a project to an existing workspace"
 
   let workspaceName: String
@@ -27,6 +27,7 @@ struct AddProjectToWorkspaceCommand: Command {
     self.verbose = arguments.boolFlags.contains("verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let workspaceManager = WorkspaceManager()
 
@@ -60,11 +61,13 @@ struct AddProjectToWorkspaceCommand: Command {
       """)
   }
 
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let cmd = try AddProjectToWorkspaceCommand(arguments: arguments)
     try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
   }
 
+  @MainActor
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try AddProjectToWorkspaceCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()

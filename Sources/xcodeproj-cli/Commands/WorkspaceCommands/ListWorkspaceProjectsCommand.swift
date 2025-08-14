@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct ListWorkspaceProjectsCommand: Command {
-  static var commandName = "list-workspace-projects"
+  static let commandName = "list-workspace-projects"
   static let description = "List all projects in a workspace"
 
   static let isReadOnly = true
@@ -26,6 +26,7 @@ struct ListWorkspaceProjectsCommand: Command {
     self.verbose = arguments.boolFlags.contains("verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let workspaceManager = WorkspaceManager()
 
@@ -67,11 +68,13 @@ struct ListWorkspaceProjectsCommand: Command {
       """)
   }
 
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
     try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
   }
 
+  @MainActor
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try ListWorkspaceProjectsCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()

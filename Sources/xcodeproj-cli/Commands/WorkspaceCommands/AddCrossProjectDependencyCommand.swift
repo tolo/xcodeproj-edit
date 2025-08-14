@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct AddCrossProjectDependencyCommand: Command {
-  static var commandName = "add-cross-project-dependency"
+  static let commandName = "add-cross-project-dependency"
   static let description = "Add a dependency on a target in another project"
 
   let targetName: String
@@ -32,6 +32,7 @@ struct AddCrossProjectDependencyCommand: Command {
     self.verbose = arguments.boolFlags.contains("verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let crossProjectManager = CrossProjectManager(xcodeproj: xcodeproj, projectPath: projectPath)
 
@@ -74,6 +75,7 @@ struct AddCrossProjectDependencyCommand: Command {
       """)
   }
 
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let cmd = try AddCrossProjectDependencyCommand(arguments: arguments)
     try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)

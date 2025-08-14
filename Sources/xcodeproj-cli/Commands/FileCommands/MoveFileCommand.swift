@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for moving or renaming a file in the project
+
 struct MoveFileCommand: Command {
   static let commandName = "move-file"
 
@@ -61,6 +62,7 @@ struct MoveFileCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension MoveFileCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

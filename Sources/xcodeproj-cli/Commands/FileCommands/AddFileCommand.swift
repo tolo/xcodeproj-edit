@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding a single file to specified group and targets
+
 struct AddFileCommand: Command {
   static let commandName = "add-file"
 
@@ -75,11 +76,13 @@ extension AddFileCommand {
     return BaseCommand.parseTargets(from: targetsString)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 
+  @MainActor
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

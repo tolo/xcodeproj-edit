@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for listing build settings with various filtering options
+
 struct ListBuildSettingsCommand: Command {
   static let commandName = "list-build-settings"
 
@@ -68,6 +69,8 @@ struct ListBuildSettingsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension ListBuildSettingsCommand {
+
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

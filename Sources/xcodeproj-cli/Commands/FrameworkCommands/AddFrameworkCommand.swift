@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding a framework to a target with optional embedding
+
 struct AddFrameworkCommand: Command {
   static let commandName = "add-framework"
 
@@ -73,12 +74,14 @@ struct AddFrameworkCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddFrameworkCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

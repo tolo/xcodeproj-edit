@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding files from a filesystem folder to project group
+
 struct AddFolderCommand: Command {
   static let commandName = "add-folder"
 
@@ -73,6 +74,7 @@ struct AddFolderCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddFolderCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
@@ -83,11 +85,13 @@ extension AddFolderCommand {
     return BaseCommand.parseTargets(from: targetsString)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 
+  @MainActor
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

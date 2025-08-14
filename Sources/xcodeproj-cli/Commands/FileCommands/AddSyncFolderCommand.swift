@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding a synchronized folder that maintains sync with filesystem
+
 struct AddSyncFolderCommand: Command {
   static let commandName = "add-sync-folder"
 
@@ -70,6 +71,7 @@ struct AddSyncFolderCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddSyncFolderCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
@@ -80,11 +82,13 @@ extension AddSyncFolderCommand {
     return BaseCommand.parseTargets(from: targetsString)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)
   }
 
+  @MainActor
   private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     try BaseCommand.validateGroup(groupPath, in: utility)
   }

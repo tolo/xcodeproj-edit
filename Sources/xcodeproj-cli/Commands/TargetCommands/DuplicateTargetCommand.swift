@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for duplicating an existing target with optional bundle ID override
+
 struct DuplicateTargetCommand: Command {
   static let commandName = "duplicate-target"
 
@@ -61,12 +62,14 @@ struct DuplicateTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension DuplicateTargetCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Protocol for command implementations
 protocol Command {
@@ -15,11 +15,12 @@ protocol Command {
 
   /// Brief description of what the command does
   static var description: String { get }
-  
+
   /// Indicates if this is a read-only command that doesn't modify the project
   static var isReadOnly: Bool { get }
 
   /// Execute the command with parsed arguments and utility
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws
 
   /// Print usage information for this specific command
@@ -54,6 +55,7 @@ class BaseCommand {
   }
 
   /// Validate that targets exist in the project
+  @MainActor
   static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {
     let projectTargets = Set(utility.pbxproj.nativeTargets.map { $0.name })
 
@@ -65,6 +67,7 @@ class BaseCommand {
   }
 
   /// Validate that a group exists in the project
+  @MainActor
   static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
     guard XcodeProjectHelpers.findGroup(named: groupPath, in: utility.pbxproj.groups) != nil else {
       throw ProjectError.groupNotFound(groupPath)

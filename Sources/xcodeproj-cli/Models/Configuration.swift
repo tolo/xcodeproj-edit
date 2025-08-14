@@ -8,7 +8,7 @@
 import Foundation
 
 /// Configuration model for xcodeproj-cli operations
-struct Configuration {
+struct Configuration: Sendable {
   let projectPath: String
   let verbose: Bool
 

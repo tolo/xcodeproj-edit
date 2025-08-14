@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct RemoveProjectFromWorkspaceCommand: Command {
-  static var commandName = "remove-project-from-workspace"
+  static let commandName = "remove-project-from-workspace"
   static let description = "Remove a project from a workspace"
 
   let workspaceName: String
@@ -27,6 +27,7 @@ struct RemoveProjectFromWorkspaceCommand: Command {
     self.verbose = arguments.boolFlags.contains("verbose")
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let workspaceManager = WorkspaceManager()
 
@@ -60,11 +61,13 @@ struct RemoveProjectFromWorkspaceCommand: Command {
       """)
   }
 
+  @MainActor
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let cmd = try RemoveProjectFromWorkspaceCommand(arguments: arguments)
     try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
   }
 
+  @MainActor
   static func executeAsWorkspaceCommand(with arguments: ParsedArguments, verbose: Bool) throws {
     let cmd = try RemoveProjectFromWorkspaceCommand(arguments: arguments)
     let workspaceManager = WorkspaceManager()

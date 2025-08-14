@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for creating group hierarchies in the project
+
 struct CreateGroupsCommand: Command {
   static let commandName = "create-groups"
 
@@ -21,7 +22,7 @@ struct CreateGroupsCommand: Command {
     }
 
     // Create all specified groups
-    try utility.createGroups(arguments.positional)
+    utility.createGroups(arguments.positional)
 
     // Save changes
     try utility.save()

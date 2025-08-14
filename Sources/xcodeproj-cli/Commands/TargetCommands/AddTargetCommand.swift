@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding a new target to the project
+
 struct AddTargetCommand: Command {
   static let commandName = "add-target"
 
@@ -80,6 +81,7 @@ struct AddTargetCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddTargetCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

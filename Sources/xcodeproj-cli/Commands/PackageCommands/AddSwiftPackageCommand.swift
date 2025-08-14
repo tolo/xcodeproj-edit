@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for adding Swift Package dependencies to the project
+
 struct AddSwiftPackageCommand: Command {
   static let commandName = "add-swift-package"
 
@@ -87,12 +88,14 @@ struct AddSwiftPackageCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension AddSwiftPackageCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

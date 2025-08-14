@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for setting build settings on specified targets
+
 struct SetBuildSettingCommand: Command {
   static let commandName = "set-build-setting"
 
@@ -71,6 +72,7 @@ struct SetBuildSettingCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension SetBuildSettingCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
@@ -81,6 +83,7 @@ extension SetBuildSettingCommand {
     return BaseCommand.parseTargets(from: targetsString)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

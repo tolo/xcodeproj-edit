@@ -6,32 +6,25 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct CreateSchemeCommand: Command {
-  static var commandName = "create-scheme"
+  static let commandName = "create-scheme"
   static let description = "Create a new scheme for a target"
 
-  let schemeName: String
-  let targetName: String
-  let shared: Bool
-  let verbose: Bool
-
-  init(arguments: ParsedArguments) throws {
-    guard let name = arguments.positional.first else {
+  @MainActor
+  static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
+    guard let schemeName = arguments.positional.first else {
       throw ProjectError.invalidArguments("Scheme name is required")
     }
 
-    self.schemeName = name
-    self.targetName = arguments.getFlag("--target", "target") ?? name  // Default to scheme name if no target specified
-    self.shared =
-      arguments.boolFlags.contains("--shared") || !arguments.boolFlags.contains("--user")
-    self.verbose = arguments.boolFlags.contains("--verbose")
-  }
+    let targetName = arguments.getFlag("--target", "target") ?? schemeName
+    let shared = arguments.boolFlags.contains("--shared") || !arguments.boolFlags.contains("--user")
+    let verbose = arguments.boolFlags.contains("--verbose")
 
-  func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
-    let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
+    let schemeManager = SchemeManager(
+      xcodeproj: utility.xcodeproj, projectPath: utility.projectPath)
 
     // Check if scheme already exists
     let existingSchemes = try schemeManager.listSchemes(shared: shared)
@@ -52,11 +45,6 @@ struct CreateSchemeCommand: Command {
       print("  Location: \(shared ? "Shared" : "User")")
       print("  Target: \(targetName)")
     }
-  }
-
-  static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
-    let cmd = try CreateSchemeCommand(arguments: arguments)
-    try cmd.execute(with: utility.xcodeproj, projectPath: utility.projectPath)
   }
 
   static func printUsage() {

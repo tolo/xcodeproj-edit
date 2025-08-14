@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for getting build settings from a target
+
 struct GetBuildSettingsCommand: Command {
   static let commandName = "get-build-settings"
 
@@ -73,12 +74,14 @@ struct GetBuildSettingsCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension GetBuildSettingsCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
   }
 
+  @MainActor
   private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
   {
     try BaseCommand.validateTargets(targetNames, in: utility)

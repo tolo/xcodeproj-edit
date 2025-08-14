@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for removing groups and their contents from the project
+
 struct RemoveGroupCommand: Command {
   static let commandName = "remove-group"
 
@@ -51,6 +52,7 @@ struct RemoveGroupCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveGroupCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

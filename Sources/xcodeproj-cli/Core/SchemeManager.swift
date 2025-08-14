@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 /// Service for managing Xcode project schemes
+@MainActor
 class SchemeManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
@@ -53,7 +54,7 @@ class SchemeManager {
     // Validate user inputs for security
     let validatedSchemeName = try SecurityUtils.validateString(name)
     let validatedTargetName = try SecurityUtils.validateString(targetName)
-    
+
     // Find the target
     guard let target = pbxproj.targets(named: validatedTargetName).first else {
       throw ProjectError.targetNotFound(validatedTargetName)
@@ -167,7 +168,7 @@ class SchemeManager {
     // Validate user inputs for security
     let validatedSourceName = try SecurityUtils.validateString(sourceName)
     let validatedDestinationName = try SecurityUtils.validateString(destinationName)
-    
+
     // Load the source scheme
     let sourceScheme = try loadScheme(name: validatedSourceName)
 
@@ -195,7 +196,7 @@ class SchemeManager {
   func removeScheme(name: String) throws {
     // Validate user input for security
     let validatedSchemeName = try SecurityUtils.validateString(name)
-    
+
     let schemePath = schemesPath + "\(validatedSchemeName).xcscheme"
 
     guard schemePath.exists else {
@@ -242,7 +243,7 @@ class SchemeManager {
     let validatedProfileConfig = try profileConfig.map { try SecurityUtils.validateString($0) }
     let validatedAnalyzeConfig = try analyzeConfig.map { try SecurityUtils.validateString($0) }
     let validatedArchiveConfig = try archiveConfig.map { try SecurityUtils.validateString($0) }
-    
+
     let scheme = try loadScheme(name: validatedSchemeName)
 
     // Update configurations
@@ -296,7 +297,7 @@ class SchemeManager {
     // Validate user inputs for security
     let validatedSchemeName = try SecurityUtils.validateString(schemeName)
     let validatedTargetName = try SecurityUtils.validateString(targetName)
-    
+
     let scheme = try loadScheme(name: validatedSchemeName)
 
     // Find the target
@@ -346,7 +347,7 @@ class SchemeManager {
     // Validate user inputs for security
     let validatedSchemeName = try SecurityUtils.validateString(schemeName)
     let validatedTargets = try targets?.map { try SecurityUtils.validateString($0) }
-    
+
     let scheme = try loadScheme(name: validatedSchemeName)
 
     guard let testAction = scheme.testAction else {
@@ -392,7 +393,7 @@ class SchemeManager {
   ) throws {
     // Validate user input for security
     let validatedSchemeName = try SecurityUtils.validateString(schemeName)
-    
+
     let scheme = try loadScheme(name: validatedSchemeName)
 
     guard let testAction = scheme.testAction else {

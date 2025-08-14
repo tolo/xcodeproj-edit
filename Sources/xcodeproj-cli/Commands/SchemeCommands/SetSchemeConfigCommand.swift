@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 struct SetSchemeConfigCommand: Command {
-  static var commandName = "set-scheme-config"
+  static let commandName = "set-scheme-config"
   static let description = "Set build configurations for scheme actions"
 
   let schemeName: String
@@ -44,6 +44,7 @@ struct SetSchemeConfigCommand: Command {
     }
   }
 
+  @MainActor
   func execute(with xcodeproj: XcodeProj, projectPath: Path) throws {
     let schemeManager = SchemeManager(xcodeproj: xcodeproj, projectPath: projectPath)
 

@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 /// Core service for manipulating Xcode project files
+@MainActor
 class XcodeProjService {
   let xcodeproj: XcodeProj
   let projectPath: Path
@@ -49,7 +50,7 @@ class XcodeProjService {
       if let cachedGroup = self.cacheManager.getGroup(path) {
         return cachedGroup
       }
-      
+
       // If not in cache, try to find it
       do {
         let foundGroup = try self.findGroupAtPath(path)

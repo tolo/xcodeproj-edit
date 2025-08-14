@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for removing Swift Package dependencies from the project
+
 struct RemoveSwiftPackageCommand: Command {
   static let commandName = "remove-swift-package"
 
@@ -48,6 +49,7 @@ struct RemoveSwiftPackageCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveSwiftPackageCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

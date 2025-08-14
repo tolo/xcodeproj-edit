@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for updating file paths using a mapping of old to new paths
+
 struct UpdatePathsMapCommand: Command {
   static let commandName = "update-paths-map"
 

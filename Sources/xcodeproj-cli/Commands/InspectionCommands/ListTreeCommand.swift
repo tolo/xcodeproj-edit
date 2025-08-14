@@ -6,14 +6,15 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for listing the complete project structure as a tree
+
 struct ListTreeCommand: Command {
   static let commandName = "list-tree"
 
   static let description = "List the complete project structure as a tree"
-  
+
   static let isReadOnly = true
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {

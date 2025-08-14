@@ -8,7 +8,7 @@
 import Foundation
 
 /// Structure for managing parsed command-line arguments
-struct ParsedArguments {
+struct ParsedArguments: Sendable {
   var positional: [String] = []
   var flags: [String: String] = [:]
   var boolFlags: Set<String> = []

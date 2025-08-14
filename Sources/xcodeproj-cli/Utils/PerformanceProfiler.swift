@@ -8,7 +8,8 @@
 import Foundation
 
 /// Performance profiler for monitoring operation timing and providing debug output
-class PerformanceProfiler {
+@MainActor
+final class PerformanceProfiler {
   // MARK: - Timing Storage
 
   private var timings: [String: TimeInterval] = [:]
@@ -60,7 +61,7 @@ class PerformanceProfiler {
     return try operation()
   }
 
-  func measureAsyncOperation<T>(_ operationName: String, operation: () async throws -> T)
+  func measureAsyncOperation<T: Sendable>(_ operationName: String, operation: () async throws -> T)
     async rethrows -> T
   {
     startTiming(operationName)
@@ -237,22 +238,31 @@ class PerformanceProfiler {
 
 // MARK: - Global Performance Profiler
 
-/// Global performance profiler instance
-private var globalProfiler: PerformanceProfiler?
+/// Thread-safe global profiler storage
+@MainActor
+private final class GlobalProfilerStorage {
+  static var shared = GlobalProfilerStorage()
+  var profiler: PerformanceProfiler?
+
+  private init() {}
+}
 
 /// Initialize global profiler with verbose flag
+@MainActor
 func initializePerformanceProfiler(verbose: Bool) {
-  globalProfiler = PerformanceProfiler(verbose: verbose)
+  GlobalProfilerStorage.shared.profiler = PerformanceProfiler(verbose: verbose)
 }
 
 /// Get global profiler instance
+@MainActor
 func getPerformanceProfiler() -> PerformanceProfiler? {
-  return globalProfiler
+  return GlobalProfilerStorage.shared.profiler
 }
 
 /// Measure an operation using the global profiler
+@MainActor
 func measureGlobalOperation<T>(_ operationName: String, operation: () throws -> T) rethrows -> T {
-  if let profiler = globalProfiler {
+  if let profiler = GlobalProfilerStorage.shared.profiler {
     return try profiler.measureOperation(operationName, operation: operation)
   } else {
     return try operation()

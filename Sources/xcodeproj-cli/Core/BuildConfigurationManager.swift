@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 /// Service for managing build configurations and .xcconfig files
+@MainActor
 class BuildConfigurationManager {
   private let xcodeproj: XcodeProj
   private let projectPath: Path
@@ -220,7 +221,8 @@ class BuildConfigurationManager {
       for (key, value) in settings {
         let stringValue = "\(value)"
         guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
-          throw ProjectError.invalidArguments("Dangerous build setting detected: \(key) = \(stringValue)")
+          throw ProjectError.invalidArguments(
+            "Dangerous build setting detected: \(key) = \(stringValue)")
         }
       }
 
@@ -233,7 +235,8 @@ class BuildConfigurationManager {
 
       destConfigObj.buildSettings = settings
       print(
-        "✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for target \(targetName)")
+        "✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for target \(targetName)"
+      )
 
     } else {
       // Copy project-level settings
@@ -252,7 +255,8 @@ class BuildConfigurationManager {
       for (key, value) in settings {
         let stringValue = "\(value)"
         guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
-          throw ProjectError.invalidArguments("Dangerous build setting detected: \(key) = \(stringValue)")
+          throw ProjectError.invalidArguments(
+            "Dangerous build setting detected: \(key) = \(stringValue)")
         }
       }
 
@@ -264,7 +268,9 @@ class BuildConfigurationManager {
       }
 
       destConfigObj.buildSettings = settings
-      print("✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for project")
+      print(
+        "✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for project"
+      )
     }
   }
 
@@ -276,12 +282,13 @@ class BuildConfigurationManager {
   ) -> [(key: String, value1: Any?, value2: Any?)] {
     // Validate user inputs - use optional validation since this returns results instead of throwing
     guard let validatedConfig1 = SecurityUtils.sanitizeString(config1),
-          let validatedConfig2 = SecurityUtils.sanitizeString(config2),
-          let validatedTargetName = targetName.map({ SecurityUtils.sanitizeString($0) }) ?? "" else {
+      let validatedConfig2 = SecurityUtils.sanitizeString(config2),
+      let validatedTargetName = targetName.map({ SecurityUtils.sanitizeString($0) }) ?? ""
+    else {
       print("⚠️ Invalid configuration names provided")
       return []
     }
-    
+
     let configList: XCConfigurationList?
 
     if !validatedTargetName.isEmpty {
@@ -345,7 +352,8 @@ class BuildConfigurationManager {
       throw ProjectError.operationFailed("No build configuration list found")
     }
 
-    guard let config = list.buildConfigurations.first(where: { $0.name == validatedConfigName }) else {
+    guard let config = list.buildConfigurations.first(where: { $0.name == validatedConfigName })
+    else {
       throw ProjectError.configurationNotFound(validatedConfigName)
     }
 
@@ -353,7 +361,8 @@ class BuildConfigurationManager {
     for (key, value) in config.buildSettings {
       let stringValue = "\(value)"
       guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
-        throw ProjectError.invalidArguments("Dangerous build setting detected, cannot export: \(key) = \(stringValue)")
+        throw ProjectError.invalidArguments(
+          "Dangerous build setting detected, cannot export: \(key) = \(stringValue)")
       }
     }
 

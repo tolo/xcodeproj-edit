@@ -6,9 +6,10 @@
 //
 
 import Foundation
-import XcodeProj
+@preconcurrency import XcodeProj
 
 /// Command for removing a file from the project
+
 struct RemoveFileCommand: Command {
   static let commandName = "remove-file"
 
@@ -49,6 +50,7 @@ struct RemoveFileCommand: Command {
 
 // MARK: - BaseCommand conformance
 extension RemoveFileCommand {
+
   private static func requirePositionalArguments(
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {

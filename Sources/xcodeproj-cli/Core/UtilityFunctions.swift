@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import PathKit
-import XcodeProj
+@preconcurrency import PathKit
+@preconcurrency import XcodeProj
 
 // MARK: - Security & Path Helpers
 
