@@ -138,8 +138,122 @@ struct SecurityUtils {
     return true
   }
 
-  /// Sanitize path using PathUtils validation (avoiding circular imports)
-  private static func sanitizePath(_ path: String) -> String? {
+  /// Sanitize and validate a user-provided path for security
+  static func sanitizePath(_ path: String) -> String? {
+    // Limit path length to prevent resource exhaustion
+    guard path.count <= 1024 else {
+      return nil  // Path too long
+    }
+
+    // Check for null bytes
+    if path.contains("\0") {
+      return nil
+    }
+
+    // Decode URL-encoded sequences that could be used to bypass filters
+    guard let decodedPath = path.removingPercentEncoding else {
+      return nil
+    }
+
+    // Normalize path by resolving . and .. components
+    let normalizedPath = (decodedPath as NSString).standardizingPath
+
+    // Block path traversal attempts that try to escape project boundaries
+    if normalizedPath.contains("../..") || normalizedPath.contains("..\\..")
+      || normalizedPath.contains("..\\..") || normalizedPath.hasPrefix("../")
+    {
+      // Allow single ../ only if it doesn't result in escaping the project root
+      let components = normalizedPath.components(separatedBy: "/")
+      var depth = 0
+      for component in components {
+        if component == ".." {
+          depth -= 1
+          if depth < 0 {  // Never allow going above project root
+            return nil
+          }
+        } else if !component.isEmpty && component != "." {
+          depth += 1
+        }
+      }
+    }
+
+    // Additional checks for suspicious patterns
+    let suspiciousPatterns = [
+      "\\x", "\\u", "%2e%2e", "%2f", "%5c",  // Encoded traversal attempts
+      "//", "\\\\",  // Double slashes
+      "\r", "\n", "\t",  // Control characters
+    ]
+
+    for pattern in suspiciousPatterns {
+      if normalizedPath.lowercased().contains(pattern.lowercased()) {
+        return nil
+      }
+    }
+
+    return normalizedPath
+  }
+
+  /// Sanitize and validate a user-provided string (names, identifiers, etc.)
+  static func sanitizeString(_ input: String) -> String? {
+    // Limit string length to prevent resource exhaustion
+    guard input.count <= 256 else {
+      return nil  // String too long
+    }
+
+    // Check for null bytes
+    if input.contains("\0") {
+      return nil
+    }
+
+    // Check for dangerous patterns that could indicate injection attempts
+    let dangerousPatterns = [
+      "$(",  // Command substitution
+      "`",  // Command substitution (backticks)
+      "${",  // Variable expansion
+      ";",  // Command separator
+      "&&",  // Command chaining
+      "||",  // Command chaining OR
+      "|",  // Pipe
+      ">",  // File redirection
+      "<",  // File input redirection
+      "eval ",  // Code evaluation
+      "exec ",  // Process execution
+      "\n",  // Newlines for injection
+      "\r",  // Carriage returns
+      "../",  // Path traversal attempts
+      "~",  // Home directory expansion
+      "\\x", "\\u",  // Encoded sequences
+      "%2e", "%2f", "%5c",  // URL-encoded dangerous chars
+    ]
+
+    let inputLower = input.lowercased()
+    for pattern in dangerousPatterns {
+      if inputLower.contains(pattern.lowercased()) {
+        return nil  // Reject dangerous input
+      }
+    }
+
+    return input
+  }
+
+  /// Validate a user-provided path and throw appropriate error if invalid
+  static func validatePath(_ path: String) throws -> String {
+    guard let validPath = sanitizePath(path) else {
+      throw ProjectError.invalidArguments("Invalid or potentially unsafe path: \(path)")
+    }
+    return validPath
+  }
+
+  /// Validate a user-provided string and throw appropriate error if invalid
+  static func validateString(_ input: String) throws -> String {
+    guard let validString = sanitizeString(input) else {
+      throw ProjectError.invalidArguments("Invalid or potentially unsafe string: \(input)")
+    }
+    return validString
+  }
+
+  /// Sanitize path using PathUtils validation (avoiding circular imports) - DEPRECATED
+  private static func deprecatedSanitizePath(_ path: String) -> String? {
     // Basic path traversal check (subset of PathUtils logic to avoid circular import)
     if path.contains("../") || path.contains("..\\") || path.hasPrefix("../") {
       return nil

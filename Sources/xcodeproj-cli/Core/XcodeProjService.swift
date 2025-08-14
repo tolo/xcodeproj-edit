@@ -44,14 +44,26 @@ class XcodeProjService {
   }
 
   private func findGroupInCache(_ path: String) -> PBXGroup? {
-    let getGroupResult = {
-      return self.cacheManager.getGroup(path) ?? (try? self.findGroupAtPath(path)) ?? nil
+    let getGroupResult: () throws -> PBXGroup? = {
+      // First check cache
+      if let cachedGroup = self.cacheManager.getGroup(path) {
+        return cachedGroup
+      }
+      
+      // If not in cache, try to find it
+      do {
+        let foundGroup = try self.findGroupAtPath(path)
+        return foundGroup
+      } catch {
+        print("⚠️  Warning: Failed to find group at path '\(path)': \(error)")
+        return nil
+      }
     }
 
     if let profiler = profiler {
-      return profiler.measureOperation("findGroup-\(path)", operation: getGroupResult)
+      return try? profiler.measureOperation("findGroup-\(path)", operation: getGroupResult)
     } else {
-      return getGroupResult()
+      return try? getGroupResult()
     }
   }
 

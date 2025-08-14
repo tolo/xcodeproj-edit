@@ -48,20 +48,24 @@ class BuildConfigurationManager {
     filePath: String,
     targetName: String? = nil
   ) throws {
+    // Validate user inputs
+    let validatedConfigName = try SecurityUtils.validateString(configName)
+    let validatedFilePath = try SecurityUtils.validatePath(filePath)
+    let validatedTargetName = try targetName.map { try SecurityUtils.validateString($0) }
     // Resolve the file path
     let resolvedPath: String
-    if filePath.hasPrefix("/") {
+    if validatedFilePath.hasPrefix("/") {
       // Absolute path - convert to relative if possible
-      let configPath = Path(filePath)
+      let configPath = Path(validatedFilePath)
       let projectDir = projectPath.parent()
       if configPath.string.hasPrefix(projectDir.string) {
         let relativePath = String(configPath.string.dropFirst(projectDir.string.count))
         resolvedPath = relativePath.hasPrefix("/") ? String(relativePath.dropFirst()) : relativePath
       } else {
-        resolvedPath = filePath
+        resolvedPath = validatedFilePath
       }
     } else {
-      resolvedPath = filePath
+      resolvedPath = validatedFilePath
     }
 
     // Create or find file reference
@@ -84,7 +88,7 @@ class BuildConfigurationManager {
     }
 
     // Apply to configurations
-    if let targetName = targetName {
+    if let targetName = validatedTargetName {
       // Apply to specific target
       guard let target = pbxproj.targets(named: targetName).first else {
         throw ProjectError.targetNotFound(targetName)
@@ -95,9 +99,9 @@ class BuildConfigurationManager {
       }
 
       for config in configList.buildConfigurations {
-        if config.name == configName {
+        if config.name == validatedConfigName {
           config.baseConfiguration = fileRef
-          print("✅ Added config file to \(targetName):\(configName)")
+          print("✅ Added config file to \(targetName):\(validatedConfigName)")
         }
       }
     } else {
@@ -107,9 +111,9 @@ class BuildConfigurationManager {
       }
 
       for config in configList.buildConfigurations {
-        if config.name == configName {
+        if config.name == validatedConfigName {
           config.baseConfiguration = fileRef
-          print("✅ Added config file to project:\(configName)")
+          print("✅ Added config file to project:\(validatedConfigName)")
         }
       }
     }
@@ -120,7 +124,10 @@ class BuildConfigurationManager {
     configName: String,
     targetName: String? = nil
   ) throws {
-    if let targetName = targetName {
+    // Validate user inputs
+    let validatedConfigName = try SecurityUtils.validateString(configName)
+    let validatedTargetName = try targetName.map { try SecurityUtils.validateString($0) }
+    if let targetName = validatedTargetName {
       // Remove from specific target
       guard let target = pbxproj.targets(named: targetName).first else {
         throw ProjectError.targetNotFound(targetName)
@@ -131,9 +138,9 @@ class BuildConfigurationManager {
       }
 
       for config in configList.buildConfigurations {
-        if config.name == configName {
+        if config.name == validatedConfigName {
           config.baseConfiguration = nil
-          print("✅ Removed config file from \(targetName):\(configName)")
+          print("✅ Removed config file from \(targetName):\(validatedConfigName)")
         }
       }
     } else {
@@ -143,9 +150,9 @@ class BuildConfigurationManager {
       }
 
       for config in configList.buildConfigurations {
-        if config.name == configName {
+        if config.name == validatedConfigName {
           config.baseConfiguration = nil
-          print("✅ Removed config file from project:\(configName)")
+          print("✅ Removed config file from project:\(validatedConfigName)")
         }
       }
     }
@@ -188,7 +195,11 @@ class BuildConfigurationManager {
     destConfig: String,
     targetName: String? = nil
   ) throws {
-    if let targetName = targetName {
+    // Validate user inputs
+    let validatedSourceConfig = try SecurityUtils.validateString(sourceConfig)
+    let validatedDestConfig = try SecurityUtils.validateString(destConfig)
+    let validatedTargetName = try targetName.map { try SecurityUtils.validateString($0) }
+    if let targetName = validatedTargetName {
       // Copy target-level settings
       guard let target = pbxproj.targets(named: targetName).first else {
         throw ProjectError.targetNotFound(targetName)
@@ -199,22 +210,30 @@ class BuildConfigurationManager {
       }
 
       let sourceSettings = configList.buildConfigurations
-        .first { $0.name == sourceConfig }?.buildSettings
+        .first { $0.name == validatedSourceConfig }?.buildSettings
 
       guard let settings = sourceSettings else {
-        throw ProjectError.configurationNotFound(sourceConfig)
+        throw ProjectError.configurationNotFound(validatedSourceConfig)
+      }
+
+      // Validate build settings for security
+      for (key, value) in settings {
+        let stringValue = "\(value)"
+        guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
+          throw ProjectError.invalidArguments("Dangerous build setting detected: \(key) = \(stringValue)")
+        }
       }
 
       guard
         let destConfigObj = configList.buildConfigurations
-          .first(where: { $0.name == destConfig })
+          .first(where: { $0.name == validatedDestConfig })
       else {
-        throw ProjectError.configurationNotFound(destConfig)
+        throw ProjectError.configurationNotFound(validatedDestConfig)
       }
 
       destConfigObj.buildSettings = settings
       print(
-        "✅ Copied build settings from \(sourceConfig) to \(destConfig) for target \(targetName)")
+        "✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for target \(targetName)")
 
     } else {
       // Copy project-level settings
@@ -223,21 +242,29 @@ class BuildConfigurationManager {
       }
 
       let sourceSettings = configList.buildConfigurations
-        .first { $0.name == sourceConfig }?.buildSettings
+        .first { $0.name == validatedSourceConfig }?.buildSettings
 
       guard let settings = sourceSettings else {
-        throw ProjectError.configurationNotFound(sourceConfig)
+        throw ProjectError.configurationNotFound(validatedSourceConfig)
+      }
+
+      // Validate build settings for security
+      for (key, value) in settings {
+        let stringValue = "\(value)"
+        guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
+          throw ProjectError.invalidArguments("Dangerous build setting detected: \(key) = \(stringValue)")
+        }
       }
 
       guard
         let destConfigObj = configList.buildConfigurations
-          .first(where: { $0.name == destConfig })
+          .first(where: { $0.name == validatedDestConfig })
       else {
-        throw ProjectError.configurationNotFound(destConfig)
+        throw ProjectError.configurationNotFound(validatedDestConfig)
       }
 
       destConfigObj.buildSettings = settings
-      print("✅ Copied build settings from \(sourceConfig) to \(destConfig) for project")
+      print("✅ Copied build settings from \(validatedSourceConfig) to \(validatedDestConfig) for project")
     }
   }
 
@@ -247,10 +274,18 @@ class BuildConfigurationManager {
     config2: String,
     targetName: String? = nil
   ) -> [(key: String, value1: Any?, value2: Any?)] {
+    // Validate user inputs - use optional validation since this returns results instead of throwing
+    guard let validatedConfig1 = SecurityUtils.sanitizeString(config1),
+          let validatedConfig2 = SecurityUtils.sanitizeString(config2),
+          let validatedTargetName = targetName.map({ SecurityUtils.sanitizeString($0) }) ?? "" else {
+      print("⚠️ Invalid configuration names provided")
+      return []
+    }
+    
     let configList: XCConfigurationList?
 
-    if let targetName = targetName {
-      configList = pbxproj.targets(named: targetName).first?.buildConfigurationList
+    if !validatedTargetName.isEmpty {
+      configList = pbxproj.targets(named: validatedTargetName).first?.buildConfigurationList
     } else {
       configList = pbxproj.rootObject?.buildConfigurationList
     }
@@ -261,10 +296,10 @@ class BuildConfigurationManager {
 
     let settings1 =
       list.buildConfigurations
-      .first { $0.name == config1 }?.buildSettings ?? BuildSettings()
+      .first { $0.name == validatedConfig1 }?.buildSettings ?? BuildSettings()
     let settings2 =
       list.buildConfigurations
-      .first { $0.name == config2 }?.buildSettings ?? BuildSettings()
+      .first { $0.name == validatedConfig2 }?.buildSettings ?? BuildSettings()
 
     var differences: [(key: String, value1: Any?, value2: Any?)] = []
 
@@ -291,9 +326,13 @@ class BuildConfigurationManager {
     format: ExportFormat = .xcconfig,
     targetName: String? = nil
   ) throws {
+    // Validate user inputs
+    let validatedConfigName = try SecurityUtils.validateString(configName)
+    let validatedOutputPath = try SecurityUtils.validatePath(outputPath)
+    let validatedTargetName = try targetName.map { try SecurityUtils.validateString($0) }
     let configList: XCConfigurationList?
 
-    if let targetName = targetName {
+    if let targetName = validatedTargetName {
       guard let target = pbxproj.targets(named: targetName).first else {
         throw ProjectError.targetNotFound(targetName)
       }
@@ -306,8 +345,16 @@ class BuildConfigurationManager {
       throw ProjectError.operationFailed("No build configuration list found")
     }
 
-    guard let config = list.buildConfigurations.first(where: { $0.name == configName }) else {
-      throw ProjectError.configurationNotFound(configName)
+    guard let config = list.buildConfigurations.first(where: { $0.name == validatedConfigName }) else {
+      throw ProjectError.configurationNotFound(validatedConfigName)
+    }
+
+    // Validate build settings for security before export
+    for (key, value) in config.buildSettings {
+      let stringValue = "\(value)"
+      guard SecurityUtils.validateBuildSetting(key: key, value: stringValue) else {
+        throw ProjectError.invalidArguments("Dangerous build setting detected, cannot export: \(key) = \(stringValue)")
+      }
     }
 
     let content: String
@@ -319,10 +366,10 @@ class BuildConfigurationManager {
     }
 
     // Write to file
-    let outputURL = URL(fileURLWithPath: outputPath)
+    let outputURL = URL(fileURLWithPath: validatedOutputPath)
     try content.write(to: outputURL, atomically: true, encoding: .utf8)
 
-    print("✅ Exported build settings to \(outputPath)")
+    print("✅ Exported build settings to \(validatedOutputPath)")
   }
 
   // MARK: - Private Helpers

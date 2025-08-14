@@ -25,6 +25,12 @@ class PathResolver {
   func resolveFilePath(for fileRef: PBXFileReference, in group: PBXGroup?) -> Path? {
     // Get the path from the file reference
     guard let filePath = fileRef.path ?? fileRef.name else { return nil }
+    
+    // Validate path for security
+    guard SecurityUtils.sanitizePath(filePath) != nil else {
+      print("⚠️  Warning: Invalid or potentially unsafe path: \(filePath)")
+      return nil
+    }
 
     // Start with project directory
     var basePath = projectDir
@@ -53,6 +59,11 @@ class PathResolver {
           }
 
           for component in pathComponents {
+            // Validate each path component for security
+            guard SecurityUtils.sanitizePath(component) != nil else {
+              print("⚠️  Warning: Invalid path component: \(component)")
+              return nil
+            }
             groupPath = groupPath + Path(component)
           }
           basePath = basePath + groupPath
@@ -72,6 +83,12 @@ class PathResolver {
   func resolveGroupPath(for group: PBXGroup) -> Path? {
     // Skip groups without a path (they're just organizational)
     guard let groupPath = group.path, !groupPath.isEmpty else { return nil }
+    
+    // Validate path for security
+    guard SecurityUtils.sanitizePath(groupPath) != nil else {
+      print("⚠️  Warning: Invalid or potentially unsafe group path: \(groupPath)")
+      return nil
+    }
 
     var basePath = projectDir
     var pathComponents: [String] = []
@@ -89,6 +106,11 @@ class PathResolver {
     }
 
     for component in pathComponents {
+      // Validate each path component for security
+      guard SecurityUtils.sanitizePath(component) != nil else {
+        print("⚠️  Warning: Invalid path component in group: \(component)")
+        return nil
+      }
       basePath = basePath + Path(component)
     }
 
@@ -103,6 +125,12 @@ class PathResolver {
   /// Gets the absolute path for a file reference based on its source tree
   func getAbsolutePath(for fileRef: PBXFileReference) -> Path? {
     guard let filePath = fileRef.path ?? fileRef.name else { return nil }
+    
+    // Validate path for security
+    guard SecurityUtils.sanitizePath(filePath) != nil else {
+      print("⚠️  Warning: Invalid or potentially unsafe file path: \(filePath)")
+      return nil
+    }
 
     if let sourceTree = fileRef.sourceTree {
       switch sourceTree {

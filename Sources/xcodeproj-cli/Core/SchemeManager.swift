@@ -50,9 +50,13 @@ class SchemeManager {
     targetName: String,
     shared: Bool = true
   ) throws -> XCScheme {
+    // Validate user inputs for security
+    let validatedSchemeName = try SecurityUtils.validateString(name)
+    let validatedTargetName = try SecurityUtils.validateString(targetName)
+    
     // Find the target
-    guard let target = pbxproj.targets(named: targetName).first else {
-      throw ProjectError.targetNotFound(targetName)
+    guard let target = pbxproj.targets(named: validatedTargetName).first else {
+      throw ProjectError.targetNotFound(validatedTargetName)
     }
 
     // Get the project
@@ -137,7 +141,7 @@ class SchemeManager {
 
     // Create the scheme
     let scheme = XCScheme(
-      name: name,
+      name: validatedSchemeName,
       lastUpgradeVersion: nil,
       version: "1.7",
       buildAction: buildAction,
@@ -160,12 +164,16 @@ class SchemeManager {
 
   /// Duplicates an existing scheme
   func duplicateScheme(sourceName: String, destinationName: String) throws -> XCScheme {
+    // Validate user inputs for security
+    let validatedSourceName = try SecurityUtils.validateString(sourceName)
+    let validatedDestinationName = try SecurityUtils.validateString(destinationName)
+    
     // Load the source scheme
-    let sourceScheme = try loadScheme(name: sourceName)
+    let sourceScheme = try loadScheme(name: validatedSourceName)
 
     // Create a new scheme with the same configuration but different name
     let duplicatedScheme = XCScheme(
-      name: destinationName,
+      name: validatedDestinationName,
       lastUpgradeVersion: sourceScheme.lastUpgradeVersion,
       version: sourceScheme.version,
       buildAction: sourceScheme.buildAction,
@@ -185,14 +193,17 @@ class SchemeManager {
 
   /// Removes a scheme
   func removeScheme(name: String) throws {
-    let schemePath = schemesPath + "\(name).xcscheme"
+    // Validate user input for security
+    let validatedSchemeName = try SecurityUtils.validateString(name)
+    
+    let schemePath = schemesPath + "\(validatedSchemeName).xcscheme"
 
     guard schemePath.exists else {
-      throw ProjectError.schemeNotFound(name)
+      throw ProjectError.schemeNotFound(validatedSchemeName)
     }
 
     try schemePath.delete()
-    print("✅ Removed scheme: \(name)")
+    print("✅ Removed scheme: \(validatedSchemeName)")
   }
 
   /// Lists all schemes
@@ -223,38 +234,47 @@ class SchemeManager {
     analyzeConfig: String? = nil,
     archiveConfig: String? = nil
   ) throws {
-    let scheme = try loadScheme(name: schemeName)
+    // Validate user inputs for security
+    let validatedSchemeName = try SecurityUtils.validateString(schemeName)
+    let validatedBuildConfig = try buildConfig.map { try SecurityUtils.validateString($0) }
+    let validatedRunConfig = try runConfig.map { try SecurityUtils.validateString($0) }
+    let validatedTestConfig = try testConfig.map { try SecurityUtils.validateString($0) }
+    let validatedProfileConfig = try profileConfig.map { try SecurityUtils.validateString($0) }
+    let validatedAnalyzeConfig = try analyzeConfig.map { try SecurityUtils.validateString($0) }
+    let validatedArchiveConfig = try archiveConfig.map { try SecurityUtils.validateString($0) }
+    
+    let scheme = try loadScheme(name: validatedSchemeName)
 
     // Update configurations
-    if let config = buildConfig {
+    if let config = validatedBuildConfig {
       // Build action doesn't have a direct configuration, it uses per-entry settings
       print("⚠️  Build configuration is set per build entry, not globally")
     }
 
-    if let config = runConfig, var launchAction = scheme.launchAction {
+    if let config = validatedRunConfig, var launchAction = scheme.launchAction {
       launchAction.buildConfiguration = config
       scheme.launchAction = launchAction
     }
 
-    if let config = testConfig, let testAction = scheme.testAction {
+    if let config = validatedTestConfig, let testAction = scheme.testAction {
       var updatedTestAction = testAction
       updatedTestAction.buildConfiguration = config
       scheme.testAction = updatedTestAction
     }
 
-    if let config = profileConfig, let profileAction = scheme.profileAction {
+    if let config = validatedProfileConfig, let profileAction = scheme.profileAction {
       var updatedProfileAction = profileAction
       updatedProfileAction.buildConfiguration = config
       scheme.profileAction = updatedProfileAction
     }
 
-    if let config = analyzeConfig, let analyzeAction = scheme.analyzeAction {
+    if let config = validatedAnalyzeConfig, let analyzeAction = scheme.analyzeAction {
       var updatedAnalyzeAction = analyzeAction
       updatedAnalyzeAction.buildConfiguration = config
       scheme.analyzeAction = updatedAnalyzeAction
     }
 
-    if let config = archiveConfig, let archiveAction = scheme.archiveAction {
+    if let config = validatedArchiveConfig, let archiveAction = scheme.archiveAction {
       var updatedArchiveAction = archiveAction
       updatedArchiveAction.buildConfiguration = config
       scheme.archiveAction = updatedArchiveAction
@@ -262,7 +282,7 @@ class SchemeManager {
 
     // Save the updated scheme
     try saveSharedScheme(scheme)
-    print("✅ Updated scheme configuration: \(schemeName)")
+    print("✅ Updated scheme configuration: \(validatedSchemeName)")
   }
 
   /// Adds a target to scheme build action
@@ -273,11 +293,15 @@ class SchemeManager {
       .running, .testing, .profiling, .archiving, .analyzing,
     ]
   ) throws {
-    let scheme = try loadScheme(name: schemeName)
+    // Validate user inputs for security
+    let validatedSchemeName = try SecurityUtils.validateString(schemeName)
+    let validatedTargetName = try SecurityUtils.validateString(targetName)
+    
+    let scheme = try loadScheme(name: validatedSchemeName)
 
     // Find the target
-    guard let target = pbxproj.targets(named: targetName).first else {
-      throw ProjectError.targetNotFound(targetName)
+    guard let target = pbxproj.targets(named: validatedTargetName).first else {
+      throw ProjectError.targetNotFound(validatedTargetName)
     }
 
     // Create buildable reference
@@ -311,7 +335,7 @@ class SchemeManager {
 
     // Save the updated scheme
     try saveSharedScheme(scheme)
-    print("✅ Added target '\(targetName)' to scheme '\(schemeName)'")
+    print("✅ Added target '\(validatedTargetName)' to scheme '\(validatedSchemeName)'")
   }
 
   /// Enables test coverage for a scheme
@@ -319,10 +343,14 @@ class SchemeManager {
     schemeName: String,
     targets: [String]? = nil
   ) throws {
-    let scheme = try loadScheme(name: schemeName)
+    // Validate user inputs for security
+    let validatedSchemeName = try SecurityUtils.validateString(schemeName)
+    let validatedTargets = try targets?.map { try SecurityUtils.validateString($0) }
+    
+    let scheme = try loadScheme(name: validatedSchemeName)
 
     guard let testAction = scheme.testAction else {
-      throw ProjectError.operationFailed("Scheme '\(schemeName)' has no test action")
+      throw ProjectError.operationFailed("Scheme '\(validatedSchemeName)' has no test action")
     }
 
     // Enable code coverage
@@ -330,7 +358,7 @@ class SchemeManager {
     updatedTestAction.codeCoverageEnabled = true
 
     // Add specific targets if provided
-    if let targetNames = targets {
+    if let targetNames = validatedTargets {
       var coverageTargets: [XCScheme.BuildableReference] = []
 
       for targetName in targetNames {
@@ -354,7 +382,7 @@ class SchemeManager {
 
     // Save the updated scheme
     try saveSharedScheme(scheme)
-    print("✅ Enabled test coverage for scheme '\(schemeName)'")
+    print("✅ Enabled test coverage for scheme '\(validatedSchemeName)'")
   }
 
   /// Sets test parallelization for a scheme
@@ -362,10 +390,13 @@ class SchemeManager {
     schemeName: String,
     enabled: Bool
   ) throws {
-    let scheme = try loadScheme(name: schemeName)
+    // Validate user input for security
+    let validatedSchemeName = try SecurityUtils.validateString(schemeName)
+    
+    let scheme = try loadScheme(name: validatedSchemeName)
 
     guard let testAction = scheme.testAction else {
-      throw ProjectError.operationFailed("Scheme '\(schemeName)' has no test action")
+      throw ProjectError.operationFailed("Scheme '\(validatedSchemeName)' has no test action")
     }
 
     // Create test execution options - Note: TestPlans API not available in this XcodeProj version
@@ -383,12 +414,13 @@ class SchemeManager {
 
     // Save the updated scheme
     try saveSharedScheme(scheme)
-    print("✅ Updated test parallelization for scheme '\(schemeName)'")
+    print("✅ Updated test parallelization for scheme '\(validatedSchemeName)'")
   }
 
   // MARK: - Private Helpers
 
   private func loadScheme(name: String) throws -> XCScheme {
+    // Note: This is a private method, so the name should already be validated by the calling methods
     let schemePath = schemesPath + "\(name).xcscheme"
 
     guard schemePath.exists else {

@@ -18,8 +18,7 @@ class WorkspaceManager {
     workingDirectory: String = FileManager.default.currentDirectoryPath, projectPath: String? = nil
   ) {
     self.workingDirectory = Path(workingDirectory)
-    self.transactionManager =
-      projectPath != nil ? TransactionManager(projectPath: Path(projectPath!)) : nil
+    self.transactionManager = projectPath.map { TransactionManager(projectPath: Path($0)) }
   }
 
   // MARK: - Transaction Support
@@ -52,11 +51,14 @@ class WorkspaceManager {
 
   /// Creates a new workspace
   func createWorkspace(name: String) throws -> XCWorkspace {
-    let workspacePath = workingDirectory + "\(name).xcworkspace"
+    // Validate user input for security
+    let validatedWorkspaceName = try SecurityUtils.validateString(name)
+    
+    let workspacePath = workingDirectory + "\(validatedWorkspaceName).xcworkspace"
 
     // Check if workspace already exists
     if workspacePath.exists {
-      throw ProjectError.operationFailed("Workspace '\(name)' already exists at \(workspacePath)")
+      throw ProjectError.operationFailed("Workspace '\(validatedWorkspaceName)' already exists at \(workspacePath)")
     }
 
     // Create workspace with self-reference
@@ -69,7 +71,7 @@ class WorkspaceManager {
     // Save the workspace
     try workspace.write(path: workspacePath, override: false)
 
-    print("✅ Created workspace: \(name).xcworkspace")
+    print("✅ Created workspace: \(validatedWorkspaceName).xcworkspace")
 
     return workspace
   }
@@ -79,13 +81,14 @@ class WorkspaceManager {
     workspaceName: String,
     projectPath: String
   ) throws {
-    // Validate project path for security
-    let resolvedProjectPath = try PathUtils.validatePath(projectPath)
+    // Validate user inputs for security
+    let validatedWorkspaceName = try SecurityUtils.validateString(workspaceName)
+    let validatedProjectPath = try SecurityUtils.validatePath(projectPath)
 
-    let workspacePath = findWorkspace(name: workspaceName)
+    let workspacePath = findWorkspace(name: validatedWorkspaceName)
 
     guard workspacePath.exists else {
-      throw ProjectError.operationFailed("Workspace '\(workspaceName)' not found")
+      throw ProjectError.operationFailed("Workspace '\(validatedWorkspaceName)' not found")
     }
 
     // Load existing workspace
@@ -94,21 +97,21 @@ class WorkspaceManager {
     // Check if project already exists in workspace
     for child in workspace.data.children {
       if case let .file(ref) = child {
-        if case let .group(path) = ref.location, path == resolvedProjectPath {
-          print("⚠️  Project '\(projectPath)' already exists in workspace")
+        if case let .group(path) = ref.location, path == validatedProjectPath {
+          print("⚠️  Project '\(validatedProjectPath)' already exists in workspace")
           return
         }
       }
     }
 
     // Add project reference
-    let projectRef = XCWorkspaceDataFileRef(location: .group(resolvedProjectPath))
+    let projectRef = XCWorkspaceDataFileRef(location: .group(validatedProjectPath))
     workspace.data.children.append(.file(projectRef))
 
     // Save the workspace
     try workspace.write(path: workspacePath, override: true)
 
-    print("✅ Added project '\(projectPath)' to workspace '\(workspaceName)'")
+    print("✅ Added project '\(validatedProjectPath)' to workspace '\(validatedWorkspaceName)'")
   }
 
   /// Removes a project from a workspace
@@ -116,13 +119,14 @@ class WorkspaceManager {
     workspaceName: String,
     projectPath: String
   ) throws {
-    // Validate project path for security
-    let validatedProjectPath = try PathUtils.validatePath(projectPath)
+    // Validate user inputs for security
+    let validatedWorkspaceName = try SecurityUtils.validateString(workspaceName)
+    let validatedProjectPath = try SecurityUtils.validatePath(projectPath)
 
-    let workspacePath = findWorkspace(name: workspaceName)
+    let workspacePath = findWorkspace(name: validatedWorkspaceName)
 
     guard workspacePath.exists else {
-      throw ProjectError.operationFailed("Workspace '\(workspaceName)' not found")
+      throw ProjectError.operationFailed("Workspace '\(validatedWorkspaceName)' not found")
     }
 
     // Load existing workspace
@@ -156,21 +160,24 @@ class WorkspaceManager {
     }
 
     if !found {
-      throw ProjectError.operationFailed("Project '\(projectPath)' not found in workspace")
+      throw ProjectError.operationFailed("Project '\(validatedProjectPath)' not found in workspace")
     }
 
     // Save the workspace
     try workspace.write(path: workspacePath, override: true)
 
-    print("✅ Removed project '\(projectPath)' from workspace '\(workspaceName)'")
+    print("✅ Removed project '\(validatedProjectPath)' from workspace '\(validatedWorkspaceName)'")
   }
 
   /// Lists all projects in a workspace
   func listWorkspaceProjects(workspaceName: String) throws -> [String] {
-    let workspacePath = findWorkspace(name: workspaceName)
+    // Validate user input for security
+    let validatedWorkspaceName = try SecurityUtils.validateString(workspaceName)
+    
+    let workspacePath = findWorkspace(name: validatedWorkspaceName)
 
     guard workspacePath.exists else {
-      throw ProjectError.workspaceNotFound(workspaceName)
+      throw ProjectError.workspaceNotFound(validatedWorkspaceName)
     }
 
     do {
@@ -195,7 +202,7 @@ class WorkspaceManager {
 
       return projects
     } catch {
-      throw ProjectError.workspaceLoadFailed(workspaceName, error)
+      throw ProjectError.workspaceLoadFailed(validatedWorkspaceName, error)
     }
   }
 
@@ -207,11 +214,15 @@ class WorkspaceManager {
     externalProjectPath: String,
     groupPath: String? = nil
   ) throws {
+    // Validate user inputs for security
+    let validatedExternalProjectPath = try SecurityUtils.validatePath(externalProjectPath)
+    let validatedGroupPath = try groupPath.map { try SecurityUtils.validateString($0) }
+    
     let pbxproj = xcodeproj.pbxproj
 
     // Find or create the group
     let group: PBXGroup
-    if let groupPath = groupPath {
+    if let groupPath = validatedGroupPath {
       guard let existingGroup = findGroup(named: groupPath, in: pbxproj.groups) else {
         throw ProjectError.groupNotFound(groupPath)
       }
@@ -224,12 +235,12 @@ class WorkspaceManager {
     }
 
     // Create file reference for the external project
-    let projectName = Path(externalProjectPath).lastComponent
+    let projectName = Path(validatedExternalProjectPath).lastComponent
     let fileRef = PBXFileReference(
       sourceTree: .group,
       name: projectName,
       lastKnownFileType: "wrapper.pb-project",
-      path: externalProjectPath
+      path: validatedExternalProjectPath
     )
 
     // Add to project
@@ -255,18 +266,23 @@ class WorkspaceManager {
     externalProjectPath: String,
     externalTargetName: String
   ) throws {
+    // Validate user inputs for security
+    let validatedTargetName = try SecurityUtils.validateString(targetName)
+    let validatedExternalProjectPath = try SecurityUtils.validatePath(externalProjectPath)
+    let validatedExternalTargetName = try SecurityUtils.validateString(externalTargetName)
+    
     let pbxproj = xcodeproj.pbxproj
 
     // Find the target
-    guard let target = pbxproj.targets(named: targetName).first else {
-      throw ProjectError.targetNotFound(targetName)
+    guard let target = pbxproj.targets(named: validatedTargetName).first else {
+      throw ProjectError.targetNotFound(validatedTargetName)
     }
 
     // Find the external project reference
-    let projectName = Path(externalProjectPath).lastComponent
+    let projectName = Path(validatedExternalProjectPath).lastComponent
     guard
       let projectRef = pbxproj.fileReferences.first(where: {
-        $0.path == externalProjectPath || $0.name == projectName
+        $0.path == validatedExternalProjectPath || $0.name == projectName
       })
     else {
       throw ProjectError.operationFailed(
@@ -278,13 +294,13 @@ class WorkspaceManager {
       containerPortal: .fileReference(projectRef),
       remoteGlobalID: nil,  // Would need to be extracted from external project
       proxyType: .nativeTarget,
-      remoteInfo: externalTargetName
+      remoteInfo: validatedExternalTargetName
     )
     pbxproj.add(object: containerProxy)
 
     // Create target dependency
     let targetDependency = PBXTargetDependency(
-      name: externalTargetName,
+      name: validatedExternalTargetName,
       targetProxy: containerProxy
     )
     pbxproj.add(object: targetDependency)
@@ -293,13 +309,14 @@ class WorkspaceManager {
     target.dependencies.append(targetDependency)
 
     print(
-      "✅ Added cross-project dependency: \(targetName) -> \(externalProjectPath):\(externalTargetName)"
+      "✅ Added cross-project dependency: \(validatedTargetName) -> \(validatedExternalProjectPath):\(validatedExternalTargetName)"
     )
   }
 
   // MARK: - Private Helpers
 
   private func findWorkspace(name: String) -> Path {
+    // Note: This is a private method, so the name should already be validated by the calling methods
     let workspaceName = name.hasSuffix(".xcworkspace") ? name : "\(name).xcworkspace"
     return workingDirectory + workspaceName
   }
