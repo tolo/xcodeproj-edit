@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**', 'issue/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: macos-14  # Use macOS 14 (Sonoma) runner which has Xcode 15/16
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Select Xcode 16
+        run: |
+          # List available Xcode versions for debugging
+          ls /Applications | grep Xcode || true
+          # Select Xcode 16.0 (or latest 16.x available)
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || \
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          # Verify selected version
+          xcodebuild -version
+          swift --version
+      
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      
+      - name: Build
+        run: |
+          swift build -c release --verbose
+      
+      - name: Run Tests
+        run: |
+          swift test --verbose
+      
+      - name: Build Universal Binary
+        run: |
+          chmod +x build-universal.sh
+          ./build-universal.sh
+      
+      - name: Verify Binary
+        run: |
+          ./xcodeproj-cli --version
+          file xcodeproj-cli
+          lipo -info xcodeproj-cli
+      
+      - name: Test Binary Commands
+        run: |
+          # Test help command
+          ./xcodeproj-cli --help
+          
+          # Test validation on test project
+          ./xcodeproj-cli --project Tests/xcodeproj-cliTests/TestResources/TestProject.xcodeproj validate

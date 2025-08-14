@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: macos-latest
+    runs-on: macos-14  # Use macOS 14 (Sonoma) runner which has Xcode 15/16
     
     permissions:
       contents: write  # Required for creating releases
@@ -15,6 +15,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Select Xcode 16
+        run: |
+          # List available Xcode versions
+          ls /Applications | grep Xcode
+          # Select Xcode 16.0 (or latest 16.x available)
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || \
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          # Verify selected version
+          xcodebuild -version
+          swift --version
       
       - name: Setup Swift
         uses: swift-actions/setup-swift@v2
