@@ -19,33 +19,42 @@ struct AddTargetFileCommand: Command {
     // Validate required arguments
     try requirePositionalArguments(
       arguments,
-      count: 2,
-      usage: "add-target-file requires: <file-path> <target-name>"
+      count: 1,
+      usage: "add-target-file requires: <file-path> --targets <target1,target2>"
     )
 
     let filePath = try PathUtils.validatePath(arguments.positional[0])
-    let targetName = arguments.positional[1]
+    
+    let targetsStr = try arguments.requireFlag(
+      "--targets", "-t",
+      error: "add-target-file requires --targets or -t flag"
+    )
+    
+    let targets = parseTargets(from: targetsStr)
 
-    // Validate target exists
-    try validateTargets([targetName], in: utility)
+    // Validate targets exist
+    try validateTargets(targets, in: utility)
 
-    // Execute the command
-    try utility.addFileToTarget(path: filePath, targetName: targetName)
+    // Execute the command for each target
+    for targetName in targets {
+      try utility.addFileToTarget(path: filePath, targetName: targetName)
+    }
   }
 
   nonisolated static func printUsage() {
     print(
       """
-      add-target-file <file-path> <target-name>
-        Add an existing file to a target's build phases
+      add-target-file <file-path> --targets <target1,target2>
+        Add an existing file to target build phases
         
         Arguments:
-          <file-path>       Path to the file (must already exist in project)
-          <target-name>     Name of the target to add file to
+          <file-path>           Path to the file (must already exist in project)
+          --targets, -t <list>  Comma-separated list of target names
         
         Examples:
-          add-target-file Sources/Model.swift MyApp
-          add-target-file Helper.swift MyAppTests
+          add-target-file Sources/Model.swift --targets MyApp
+          add-target-file Helper.swift --targets MyAppTests,MyFrameworkTests
+          add-target-file Utils.swift -t MyApp,MyWidget
       """)
   }
 }
@@ -56,6 +65,10 @@ extension AddTargetFileCommand {
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
+  }
+  
+  private static func parseTargets(from targetsString: String) -> [String] {
+    return BaseCommand.parseTargets(from: targetsString)
   }
 
   @MainActor

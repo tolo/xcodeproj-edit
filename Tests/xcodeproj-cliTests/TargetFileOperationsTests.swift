@@ -45,7 +45,7 @@ final class TargetFileOperationsTests: XCTestCase {
     
     // Now add the same file to another target using add-target-file
     result = try TestHelpers.runCommand("add-target-file", arguments: [
-      "--project", projectPath, sourceFile.path, "TestFramework"
+      "--project", projectPath, sourceFile.path, "--targets", "TestFramework"
     ])
     XCTAssertTrue(result.success)
     
@@ -58,7 +58,7 @@ final class TargetFileOperationsTests: XCTestCase {
   
   func testAddTargetFileNonExistentFile() throws {
     let result = try TestHelpers.runCommand("add-target-file", arguments: [
-      "--project", projectPath, "NonExistent.swift", "TestApp"
+      "--project", projectPath, "NonExistent.swift", "--targets", "TestApp"
     ])
     
     XCTAssertFalse(result.success)
@@ -80,7 +80,7 @@ final class TargetFileOperationsTests: XCTestCase {
     
     // Remove from one target only
     result = try TestHelpers.runCommand("remove-target-file", arguments: [
-      "--project", projectPath, sourceFile.path, "TestFramework"
+      "--project", projectPath, sourceFile.path, "--targets", "TestFramework"
     ])
     XCTAssertTrue(result.success)
     

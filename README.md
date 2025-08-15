@@ -513,8 +513,8 @@ done
 | `move-file` | Move or rename file | `move-file old/path new/path` |
 | `remove-file` | Remove file from project | `remove-file Path/File.swift` |
 | `remove-folder` | (Deprecated - use `remove-group`) | `remove-group Path/Folder` |
-| `add-target-file` | Add existing file to target | `add-target-file Path/File.swift TargetName` |
-| `remove-target-file` | Remove file from target only | `remove-target-file Path/File.swift TargetName` |
+| `add-target-file` | Add existing file to targets | `add-target-file Path/File.swift --targets Target1,Target2` |
+| `remove-target-file` | Remove file from targets only | `remove-target-file Path/File.swift --targets Target1,Target2` |
 
 ### 🎯 Target Operations
 | Command | Description | Example |

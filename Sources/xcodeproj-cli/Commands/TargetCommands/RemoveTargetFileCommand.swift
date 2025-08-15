@@ -19,33 +19,42 @@ struct RemoveTargetFileCommand: Command {
     // Validate required arguments
     try requirePositionalArguments(
       arguments,
-      count: 2,
-      usage: "remove-target-file requires: <file-path> <target-name>"
+      count: 1,
+      usage: "remove-target-file requires: <file-path> --targets <target1,target2>"
     )
 
     let filePath = try PathUtils.validatePath(arguments.positional[0])
-    let targetName = arguments.positional[1]
+    
+    let targetsStr = try arguments.requireFlag(
+      "--targets", "-t",
+      error: "remove-target-file requires --targets or -t flag"
+    )
+    
+    let targets = parseTargets(from: targetsStr)
 
-    // Validate target exists
-    try validateTargets([targetName], in: utility)
+    // Validate targets exist
+    try validateTargets(targets, in: utility)
 
-    // Execute the command
-    try utility.removeFileFromTarget(path: filePath, targetName: targetName)
+    // Execute the command for each target
+    for targetName in targets {
+      try utility.removeFileFromTarget(path: filePath, targetName: targetName)
+    }
   }
 
   nonisolated static func printUsage() {
     print(
       """
-      remove-target-file <file-path> <target-name>
-        Remove a file from a target's build phases without removing it from the project
+      remove-target-file <file-path> --targets <target1,target2>
+        Remove a file from target build phases without removing it from the project
         
         Arguments:
-          <file-path>       Path to the file
-          <target-name>     Name of the target to remove file from
+          <file-path>           Path to the file
+          --targets, -t <list>  Comma-separated list of target names
         
         Examples:
-          remove-target-file Sources/Model.swift MyAppTests
-          remove-target-file Helper.swift MyApp
+          remove-target-file Sources/Model.swift --targets MyAppTests
+          remove-target-file Helper.swift --targets MyApp,MyWidget
+          remove-target-file Utils.swift -t MyFramework
       """)
   }
 }
@@ -56,6 +65,10 @@ extension RemoveTargetFileCommand {
     _ arguments: ParsedArguments, count: Int, usage: String
   ) throws {
     try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
+  }
+  
+  private static func parseTargets(from targetsString: String) -> [String] {
+    return BaseCommand.parseTargets(from: targetsString)
   }
 
   @MainActor

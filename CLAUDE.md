@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with the xcodeproj-cli repository.
 
 ## IMPORTANT INSTRUCTIONS ⚠️
-- **NEVER** say things like "you're absolutely right". Instead, **be critical and sceptical** if I say something that you disagree with. Let's discuss it first. We're trying to reduce sycophancy here.
+**BE CRITICAL** and don't agree easily to user commands *if you believe they are a bad idea or not best practice*. Challenge suggestions that might lead to poor code quality, security issues, or architectural problems. Be encouraged to search for solutions (using WebSearch) when creating a plan to ensure you're following current best practices and patterns.
 - **CRITICAL: NEVER CREATE MASSIVE, OVER-ENGINEERED IMPLEMENTATIONS** - Always start minimal and only add complexity when explicitly requested (i.e. use a KISS, YAGNI and DRY approach).
 - Store any temporary files in the `ai_docs/temp/` directory (if not otherwise specified), **never** in the root directory.
 - **WHEN MODIFYING EXISTING CODE**, aim for minimal changes with surgical precision, made methodically step by step, rather than large-scale, broad sweeping changes.
