@@ -77,6 +77,9 @@ brew tap tolo/xcodeproj
 
 # Install the tool
 brew install xcodeproj-cli
+
+# Upgrade to latest version
+brew upgrade tolo/xcodeproj/xcodeproj-cli
 ```
 
 The tool will be available as `xcodeproj-cli` in your PATH:
