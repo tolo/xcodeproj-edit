@@ -94,61 +94,7 @@ final class TargetFileOperationsTests: XCTestCase {
     // This would require more detailed inspection of the project structure
   }
   
-  // MARK: - add-file --targets-only tests
-  
-  func testAddFileTargetsOnlyFlag() throws {
-    let sourceFile = tempDir.appendingPathComponent("ExistingFile.swift")
-    try "// Existing file".write(to: sourceFile, atomically: true, encoding: .utf8)
-    
-    // First add to project without targets
-    var result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path,
-      "--group", "Sources", "--targets", "TestApp"
-    ])
-    XCTAssertTrue(result.success)
-    
-    // Now add to another target using --targets-only
-    result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path,
-      "--targets-only", "--targets", "TestFramework"
-    ])
-    XCTAssertTrue(result.success)
-    
-    // Verify success (would need more detailed verification)
-    result = try TestHelpers.runCommand("list-files", arguments: [
-      "--project", projectPath
-    ])
-    XCTAssertTrue(result.output.contains("ExistingFile.swift"))
-  }
-  
-  // MARK: - remove-file --targets tests
-  
-  func testRemoveFileWithTargetsFlag() throws {
-    let sourceFile = tempDir.appendingPathComponent("MultiTargetFile.swift")
-    try "// Multi-target file".write(to: sourceFile, atomically: true, encoding: .utf8)
-    
-    // Add to multiple targets
-    var result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path,
-      "--group", "Sources", "--targets", "TestApp,TestFramework"
-    ])
-    XCTAssertTrue(result.success)
-    
-    // Remove from specific target only
-    result = try TestHelpers.runCommand("remove-file", arguments: [
-      "--project", projectPath, sourceFile.path,
-      "--targets", "TestApp"
-    ])
-    XCTAssertTrue(result.success)
-    
-    // File should still be in project
-    result = try TestHelpers.runCommand("list-files", arguments: [
-      "--project", projectPath
-    ])
-    XCTAssertTrue(result.output.contains("MultiTargetFile.swift"))
-  }
-  
-  func testRemoveFileWithoutTargetsRemovesCompletely() throws {
+  func testRemoveFileCompletelyFromProject() throws {
     let sourceFile = tempDir.appendingPathComponent("TempFile.swift")
     try "// Temp file".write(to: sourceFile, atomically: true, encoding: .utf8)
     
@@ -159,7 +105,7 @@ final class TargetFileOperationsTests: XCTestCase {
     ])
     XCTAssertTrue(result.success)
     
-    // Remove without --targets flag (removes completely)
+    // Remove completely from project
     result = try TestHelpers.runCommand("remove-file", arguments: [
       "--project", projectPath, sourceFile.path
     ])

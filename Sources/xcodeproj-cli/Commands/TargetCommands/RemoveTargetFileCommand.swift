@@ -29,8 +29,8 @@ struct RemoveTargetFileCommand: Command {
     // Validate target exists
     try validateTargets([targetName], in: utility)
 
-    // Execute the command - uses the new utility method
-    try utility.removeFileFromTargets(path: filePath, targets: [targetName])
+    // Execute the command
+    try utility.removeFileFromTarget(path: filePath, targetName: targetName)
   }
 
   nonisolated static func printUsage() {

@@ -1168,7 +1168,7 @@ class XcodeProjUtility {
   
   // MARK: - Target-Only File Operations
   
-  func addFileToTargetsOnly(path: String, targets: [String]) throws {
+  func addFileToTarget(path: String, targetName: String) throws {
     // Find the file reference - it must already exist in the project
     let fileName = (path as NSString).lastPathComponent
     
@@ -1185,17 +1185,17 @@ class XcodeProjUtility {
       throw ProjectError.operationFailed("File not found in project: \(path). File must already exist in the project to add to targets.")
     }
     
-    // Add to targets using BuildPhaseManager
+    // Add to target using BuildPhaseManager
     buildPhaseManager.addFileToBuildPhases(
       fileReference: fileRef,
-      targets: targets,
+      targets: [targetName],
       isCompilable: isCompilableFile(path)
     )
     
-    print("✅ Added \(fileName) to targets: \(targets.joined(separator: ", "))")
+    print("✅ Added \(fileName) to target: \(targetName)")
   }
   
-  func removeFileFromTargets(path: String, targets: [String]) throws {
+  func removeFileFromTarget(path: String, targetName: String) throws {
     // Find the file reference
     let fileName = (path as NSString).lastPathComponent
     
@@ -1212,43 +1212,39 @@ class XcodeProjUtility {
       throw ProjectError.operationFailed("File not found in project: \(path)")
     }
     
-    // Remove from specified targets only
-    for targetName in targets {
-      guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
-        print("⚠️  Target '\(targetName)' not found")
-        continue
-      }
-      
-      // Remove from all build phases of this target
-      for buildPhase in target.buildPhases {
-        switch buildPhase {
-        case let sourcesBuildPhase as PBXSourcesBuildPhase:
-          if let buildFile = sourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
-            sourcesBuildPhase.files?.removeAll { $0 === buildFile }
-            pbxproj.delete(object: buildFile)
-          }
-        case let resourcesBuildPhase as PBXResourcesBuildPhase:
-          if let buildFile = resourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
-            resourcesBuildPhase.files?.removeAll { $0 === buildFile }
-            pbxproj.delete(object: buildFile)
-          }
-        case let frameworksBuildPhase as PBXFrameworksBuildPhase:
-          if let buildFile = frameworksBuildPhase.files?.first(where: { $0.file === fileRef }) {
-            frameworksBuildPhase.files?.removeAll { $0 === buildFile }
-            pbxproj.delete(object: buildFile)
-          }
-        case let copyFilesBuildPhase as PBXCopyFilesBuildPhase:
-          if let buildFile = copyFilesBuildPhase.files?.first(where: { $0.file === fileRef }) {
-            copyFilesBuildPhase.files?.removeAll { $0 === buildFile }
-            pbxproj.delete(object: buildFile)
-          }
-        default:
-          continue
+    guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
+      throw ProjectError.targetNotFound(targetName)
+    }
+    
+    // Remove from all build phases of this target
+    for buildPhase in target.buildPhases {
+      switch buildPhase {
+      case let sourcesBuildPhase as PBXSourcesBuildPhase:
+        if let buildFile = sourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+          sourcesBuildPhase.files?.removeAll { $0 === buildFile }
+          pbxproj.delete(object: buildFile)
         }
+      case let resourcesBuildPhase as PBXResourcesBuildPhase:
+        if let buildFile = resourcesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+          resourcesBuildPhase.files?.removeAll { $0 === buildFile }
+          pbxproj.delete(object: buildFile)
+        }
+      case let frameworksBuildPhase as PBXFrameworksBuildPhase:
+        if let buildFile = frameworksBuildPhase.files?.first(where: { $0.file === fileRef }) {
+          frameworksBuildPhase.files?.removeAll { $0 === buildFile }
+          pbxproj.delete(object: buildFile)
+        }
+      case let copyFilesBuildPhase as PBXCopyFilesBuildPhase:
+        if let buildFile = copyFilesBuildPhase.files?.first(where: { $0.file === fileRef }) {
+          copyFilesBuildPhase.files?.removeAll { $0 === buildFile }
+          pbxproj.delete(object: buildFile)
+        }
+      default:
+        continue
       }
     }
     
-    print("✅ Removed \(fileName) from targets: \(targets.joined(separator: ", "))")
+    print("✅ Removed \(fileName) from target: \(targetName)")
   }
 
   // MARK: - Path Updates

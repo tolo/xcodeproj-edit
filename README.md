@@ -507,13 +507,11 @@ done
 | Command | Description | Example |
 |---------|-------------|---------|
 | `add-file` | Add single file | `add-file Path/File.swift --group GroupName --targets Target1,Target2` |
-| `add-file` | Add to targets only | `add-file Path/File.swift --targets-only --targets Target1,Target2` |
 | `add-files` | Add multiple files | `add-files file1:group1 file2:group2 --targets Target` |
 | `add-folder` | Create group from folder contents | `add-folder Path/Folder --group GroupName --targets Target --recursive` |
 | `add-sync-folder` | Add synced folder reference (Xcode 16+) | `add-sync-folder Path/Assets --group GroupName --targets Target` |
 | `move-file` | Move or rename file | `move-file old/path new/path` |
 | `remove-file` | Remove file from project | `remove-file Path/File.swift` |
-| `remove-file` | Remove from targets only | `remove-file Path/File.swift --targets Target1,Target2` |
 | `remove-folder` | (Deprecated - use `remove-group`) | `remove-group Path/Folder` |
 | `add-target-file` | Add existing file to target | `add-target-file Path/File.swift TargetName` |
 | `remove-target-file` | Remove file from target only | `remove-target-file Path/File.swift TargetName` |

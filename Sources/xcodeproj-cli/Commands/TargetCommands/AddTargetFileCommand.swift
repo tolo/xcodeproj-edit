@@ -29,8 +29,8 @@ struct AddTargetFileCommand: Command {
     // Validate target exists
     try validateTargets([targetName], in: utility)
 
-    // Execute the command - uses the new utility method
-    try utility.addFileToTargetsOnly(path: filePath, targets: [targetName])
+    // Execute the command
+    try utility.addFileToTarget(path: filePath, targetName: targetName)
   }
 
   nonisolated static func printUsage() {
