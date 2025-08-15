@@ -488,8 +488,10 @@ done
 | Command | Description | Example |
 |---------|-------------|---------|
 | `list-tree` | **Show complete project tree** (recommended) | `list-tree` |
+| `list-tree` | Show target's files as tree | `list-tree --target TargetName` |
 | `list-targets` | Show all targets in project | `list-targets` |
 | `list-files` | Show files only (flat list) | `list-files [group-name]` |
+| `list-files` | List files in specific target | `list-files --target TargetName` |
 | `list-groups` | Show groups in tree format (no files) | `list-groups` |
 | `validate` | Check project integrity | `validate` |
 | `list-invalid-references` | Find broken file references | `list-invalid-references` |
@@ -502,6 +504,9 @@ done
 | `remove-group` | Remove any group/folder type | `remove-group OldGroup` |
 
 ### 📁 File & Folder Management
+
+> **Note**: File paths can be specified as: filename only (`Model.swift`), partial path (`Sources/Model.swift`), or full project path
+
 | Command | Description | Example |
 |---------|-------------|---------|
 | `add-file` | Add single file | `add-file Path/File.swift --group GroupName --targets Target1,Target2` |
@@ -511,6 +516,8 @@ done
 | `move-file` | Move or rename file | `move-file old/path new/path` |
 | `remove-file` | Remove file from project | `remove-file Path/File.swift` |
 | `remove-folder` | (Deprecated - use `remove-group`) | `remove-group Path/Folder` |
+| `add-target-file` | Add existing file to targets | `add-target-file File.swift --targets Target1,Target2` |
+| `remove-target-file` | Remove file from targets only | `remove-target-file File.swift --targets Target1,Target2` |
 
 ### 🎯 Target Operations
 | Command | Description | Example |

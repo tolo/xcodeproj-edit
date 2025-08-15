@@ -5,6 +5,28 @@ All notable changes to xcodeproj-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-08-15
+
+### Added
+- **Target File Management**: New commands for managing file-to-target associations without modifying project structure
+  - `add-target-file` - Add existing project files to additional targets' compile sources or resources
+  - `remove-target-file` - Remove files from specific targets while keeping them in the project
+  - Both commands support multiple targets via `--targets` flag for batch operations
+- **Target Filtering for Inspection Commands**: Enhanced list commands with target-specific filtering
+  - `list-files --target <name>` - List files in a specific target
+  - `list-tree --target <name>` - Show project tree filtered by target membership
+- **Command-Specific Help System**: Individual command help via `--help` flag
+  - Use `xcodeproj-cli <command> --help` or `-h` to get detailed usage for any command
+  - Works without requiring a project file to be present
+  - All 45+ commands have comprehensive help documentation with examples
+
+### Improved
+- **File Path Flexibility**: All file-related commands now support flexible path matching
+  - Filename only: `Model.swift` matches any file with that name
+  - Partial path: `Sources/Model.swift` matches files with that path segment
+  - Full project path: Complete path within the project structure
+- **Documentation**: Updated README with clearer explanations of file path handling
+
 ## [2.0.0] - 2025-08-12
 
 ### ⚠️ BREAKING CHANGES
