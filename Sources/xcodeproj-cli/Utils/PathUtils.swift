@@ -61,6 +61,11 @@ struct PathUtils {
   /// Returns true if the file reference matches the search path
   /// Supports: exact match, filename match, and partial path match
   static func fileReferenceMatches(fileRef: PBXFileReference, searchPath: String) -> Bool {
+    // Handle empty search path
+    guard !searchPath.isEmpty else {
+      return false
+    }
+    
     // Strategy 1: Exact path or name match
     if fileRef.path == searchPath || fileRef.name == searchPath {
       return true
@@ -70,8 +75,8 @@ struct PathUtils {
     let searchFileName = (searchPath as NSString).lastPathComponent
     let refFileName = ((fileRef.path ?? fileRef.name ?? "") as NSString).lastPathComponent
     
-    if !searchFileName.isEmpty && searchFileName == refFileName {
-      // For filename-only searches, prefer exact filename matches
+    // Only match if search is filename only (no path separators) and filenames match exactly
+    if !searchPath.contains("/") && !searchFileName.isEmpty && searchFileName == refFileName {
       return true
     }
     
@@ -82,7 +87,7 @@ struct PathUtils {
       let refComponents = refPath.split(separator: "/").map(String.init)
       
       // Check if search path components appear in order at the end of ref path
-      if searchComponents.count <= refComponents.count {
+      if searchComponents.count <= refComponents.count && searchComponents.count > 1 {
         let startIndex = refComponents.count - searchComponents.count
         let refSuffix = Array(refComponents[startIndex...])
         if refSuffix == searchComponents {
