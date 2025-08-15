@@ -24,11 +24,29 @@ struct CLIRunner {
       exit(0)
     }
 
-    // Handle help flag
-    let isHelpRequest = args.isEmpty || args.count > 0 && (args[0] == "--help" || args[0] == "-h")
-    if isHelpRequest {
+    // Handle global help flag
+    let isGlobalHelpRequest = args.isEmpty || args.count > 0 && (args[0] == "--help" || args[0] == "-h")
+    if isGlobalHelpRequest {
       CLIInterface.printUsage()
       exit(0)
+    }
+
+    // Check for command-specific help: <command> --help
+    if args.count >= 2 {
+      let possibleCommand = args[0]
+      let helpFlag = args[1]
+      
+      if (helpFlag == "--help" || helpFlag == "-h") && !possibleCommand.starts(with: "-") {
+        // Check if it's a valid command first
+        let availableCommands = CommandRegistry.availableCommands()
+        let workspaceOnlyCommands = ["create-workspace", "add-project-to-workspace", "remove-project-from-workspace", "list-workspace-projects"]
+        let allCommands = Set(availableCommands + workspaceOnlyCommands)
+        
+        if allCommands.contains(possibleCommand) {
+          CommandRegistry.printCommandUsage(possibleCommand)
+          exit(0)
+        }
+      }
     }
 
     // Extract command early to check if it's workspace-only
