@@ -19,7 +19,7 @@ struct ListTreeCommand: Command {
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let targetName = arguments.getFlag("--target", "-t")
-    
+
     if let targetName = targetName {
       try utility.listTargetTree(targetName: targetName)
     } else {

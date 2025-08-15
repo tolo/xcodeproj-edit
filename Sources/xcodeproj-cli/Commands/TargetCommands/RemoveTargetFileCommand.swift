@@ -13,27 +13,26 @@ import Foundation
 struct RemoveTargetFileCommand: Command {
   static let commandName = "remove-target-file"
 
-  static let description = "Remove a file from a target's compile sources or resources without removing it from the project"
+  static let description =
+    "Remove a file from a target's compile sources or resources without removing it from the project"
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
-    try requirePositionalArguments(
+    try BaseCommand.requirePositionalArguments(
       arguments,
       count: 1,
       usage: "remove-target-file requires: <file-path> --targets <target1,target2>"
     )
 
     let filePath = try PathUtils.validatePath(arguments.positional[0])
-    
-    let targetsStr = try arguments.requireFlag(
-      "--targets", "-t",
-      error: "remove-target-file requires --targets or -t flag"
-    )
-    
-    let targets = parseTargets(from: targetsStr)
+
+    // Get targets using the new helper that accepts both --target and --targets
+    guard let targets = try BaseCommand.getTargets(from: arguments, requireFlag: true) else {
+      throw ProjectError.invalidArguments("remove-target-file requires --targets or --target flag")
+    }
 
     // Validate targets exist
-    try validateTargets(targets, in: utility)
+    try BaseCommand.validateTargets(targets, in: utility)
 
     // Execute the command for each target
     for targetName in targets {
@@ -44,39 +43,24 @@ struct RemoveTargetFileCommand: Command {
   nonisolated static func printUsage() {
     print(
       """
-      remove-target-file <file-path> --targets <target1,target2>
+      remove-target-file <file-path> (--targets <target1,target2> | --target <target>)
         Remove a file from target build phases without removing it from the project
         
         Arguments:
-          <file-path>           Path to the file in the project
-                                Can be: filename only (Model.swift),
-                                partial path (Sources/Model.swift),
-                                or full project path
-          --targets, -t <list>  Comma-separated list of target names
+          <file-path>                   Path to the file in the project
+                                        Can be: filename only (Model.swift),
+                                        partial path (Sources/Model.swift),
+                                        or full project path
+          --targets, --target, -t <list>  Target names (comma-separated for multiple)
+                                        --targets: accepts multiple comma-separated targets
+                                        --target: accepts single or comma-separated targets
+                                        -t: short form for either flag
         
         Examples:
           remove-target-file Sources/Model.swift --targets MyAppTests
-          remove-target-file Helper.swift --targets MyApp,MyWidget
-          remove-target-file Utils.swift -t MyFramework
+          remove-target-file Helper.swift --target MyApp
+          remove-target-file Utils.swift --targets MyApp,MyWidget
+          remove-target-file Config.swift -t MyFramework
       """)
-  }
-}
-
-// MARK: - BaseCommand conformance
-extension RemoveTargetFileCommand {
-  private static func requirePositionalArguments(
-    _ arguments: ParsedArguments, count: Int, usage: String
-  ) throws {
-    try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
-  }
-  
-  private static func parseTargets(from targetsString: String) -> [String] {
-    return BaseCommand.parseTargets(from: targetsString)
-  }
-
-  @MainActor
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
-  {
-    try BaseCommand.validateTargets(targetNames, in: utility)
   }
 }

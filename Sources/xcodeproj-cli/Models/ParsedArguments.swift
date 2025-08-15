@@ -16,7 +16,7 @@ struct ParsedArguments: Sendable {
   func flag(_ names: String...) -> String? {
     return getFlagFromArray(names)
   }
-  
+
   func getFlag(_ names: String...) -> String? {
     return getFlagFromArray(names)
   }

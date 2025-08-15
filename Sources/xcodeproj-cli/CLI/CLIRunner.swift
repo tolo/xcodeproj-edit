@@ -25,7 +25,8 @@ struct CLIRunner {
     }
 
     // Handle global help flag
-    let isGlobalHelpRequest = args.isEmpty || args.count > 0 && (args[0] == "--help" || args[0] == "-h")
+    let isGlobalHelpRequest =
+      args.isEmpty || args.count > 0 && (args[0] == "--help" || args[0] == "-h")
     if isGlobalHelpRequest {
       CLIInterface.printUsage()
       exit(0)
@@ -35,13 +36,16 @@ struct CLIRunner {
     if args.count >= 2 {
       let possibleCommand = args[0]
       let helpFlag = args[1]
-      
+
       if (helpFlag == "--help" || helpFlag == "-h") && !possibleCommand.starts(with: "-") {
         // Check if it's a valid command first
         let availableCommands = CommandRegistry.availableCommands()
-        let workspaceOnlyCommands = ["create-workspace", "add-project-to-workspace", "remove-project-from-workspace", "list-workspace-projects"]
+        let workspaceOnlyCommands = [
+          "create-workspace", "add-project-to-workspace", "remove-project-from-workspace",
+          "list-workspace-projects",
+        ]
         let allCommands = Set(availableCommands + workspaceOnlyCommands)
-        
+
         if allCommands.contains(possibleCommand) {
           CommandRegistry.printCommandUsage(possibleCommand)
           exit(0)
@@ -278,15 +282,19 @@ struct CLIRunner {
   private static func getValidFlagsForCommand(_ command: String) -> Set<String> {
     switch command {
     case "add-file":
-      return ["--group", "-g", "--targets", "-t", "--create-groups", "--no-groups"]
+      return ["--group", "-g", "--targets", "--target", "-t", "--create-groups", "--no-groups"]
     case "add-files":
-      return ["--group", "-g", "--targets", "-t", "--create-groups", "--no-groups"]
+      return ["--group", "-g", "--targets", "--target", "-t", "--create-groups", "--no-groups"]
     case "add-folder":
-      return ["--group", "-g", "--targets", "-t", "--recursive", "-r", "--create-groups"]
+      return [
+        "--group", "-g", "--targets", "--target", "-t", "--recursive", "-r", "--create-groups",
+      ]
     case "add-sync-folder":
-      return ["--group", "-g", "--targets", "-t", "--recursive", "-r", "--create-groups"]
+      return [
+        "--group", "-g", "--targets", "--target", "-t", "--recursive", "-r", "--create-groups",
+      ]
     case "remove-file":
-      return ["--targets"]
+      return ["--targets", "--target"]
     case "move-file":
       return ["--to-group"]
     case "add-target":
@@ -306,9 +314,9 @@ struct CLIRunner {
     case "remove-group":
       return []
     case "set-build-setting":
-      return ["--targets", "--configs"]
+      return ["--targets", "--target", "--configs"]
     case "get-build-settings":
-      return ["--targets", "--configs"]
+      return ["--targets", "--target", "--configs"]
     case "list-build-settings":
       return [
         "--target", "-t", "--config", "-c", "--show-inherited", "-i", "--json", "-j", "--all", "-a",
@@ -318,7 +326,7 @@ struct CLIRunner {
     case "list-build-configs":
       return []
     case "add-framework":
-      return ["--targets", "--search-path"]
+      return ["--targets", "--target", "--search-path"]
     case "add-swift-package":
       return ["--version", "-v", "--branch", "-b", "--commit", "-c", "--target", "-t"]
     case "remove-swift-package":
@@ -330,9 +338,13 @@ struct CLIRunner {
     case "validate":
       return ["--fix"]
     case "list-files":
-      return ["--targets", "--groups"]
+      return ["--target", "-t"]
     case "list-tree":
-      return []
+      return ["--target", "-t"]
+    case "add-target-file":
+      return ["--targets", "--target", "-t"]
+    case "remove-target-file":
+      return ["--targets", "--target", "-t"]
     case "list-invalid-references":
       return []
     case "remove-invalid-references":
@@ -342,7 +354,7 @@ struct CLIRunner {
     case "update-paths-map":
       return ["--map"]
     case "create-scheme":
-      return ["--targets", "--test-targets"]
+      return ["--targets", "--target", "--test-targets"]
     case "duplicate-scheme":
       return ["--new-name"]
     case "remove-scheme":

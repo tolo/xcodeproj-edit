@@ -54,6 +54,28 @@ class BaseCommand {
     return targetsString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
   }
 
+  /// Get targets from arguments, supporting both --target and --targets flags
+  /// Accepts both singular --target and plural --targets for consistency
+  static func getTargets(from arguments: ParsedArguments, requireFlag: Bool = true) throws
+    -> [String]?
+  {
+    // Check for --targets (plural) first
+    if let targetsStr = arguments.getFlag("--targets", "-t") {
+      return parseTargets(from: targetsStr)
+    }
+
+    // Fall back to --target (singular) for consistency
+    if let targetStr = arguments.getFlag("--target") {
+      return parseTargets(from: targetStr)
+    }
+
+    if requireFlag {
+      throw ProjectError.invalidArguments("Missing required --targets or --target flag")
+    }
+
+    return nil
+  }
+
   /// Validate that targets exist in the project
   @MainActor
   static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws {

@@ -20,7 +20,7 @@ struct ListFilesCommand: Command {
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     let groupName = arguments.positional.first
     let targetName = arguments.getFlag("--target", "-t")
-    
+
     // If target filter is specified, show files in that target
     if let targetName = targetName {
       try listFilesInTarget(targetName, utility: utility)
@@ -75,17 +75,17 @@ extension ListFilesCommand {
       }
     }
   }
-  
+
   @MainActor
   static func listFilesInTarget(_ targetName: String, utility: XcodeProjUtility) throws {
     guard let target = utility.pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {
       throw ProjectError.targetNotFound(targetName)
     }
-    
+
     print("📁 Files in target '\(targetName)':")
-    
+
     var fileReferences: Set<PBXFileReference> = []
-    
+
     // Collect files from all build phases
     for buildPhase in target.buildPhases {
       switch buildPhase {
@@ -125,16 +125,16 @@ extension ListFilesCommand {
         continue
       }
     }
-    
+
     // Sort and display files
-    let sortedFiles = fileReferences.sorted { 
-      ($0.path ?? $0.name ?? "") < ($1.path ?? $1.name ?? "") 
+    let sortedFiles = fileReferences.sorted {
+      ($0.path ?? $0.name ?? "") < ($1.path ?? $1.name ?? "")
     }
-    
+
     for fileRef in sortedFiles {
       print("  - \(fileRef.path ?? fileRef.name ?? "unknown")")
     }
-    
+
     if fileReferences.isEmpty {
       print("  (no files)")
     } else {

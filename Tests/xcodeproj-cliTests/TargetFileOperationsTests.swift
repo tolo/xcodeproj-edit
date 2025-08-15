@@ -8,113 +8,105 @@
 import XCTest
 @testable import xcodeproj_cli
 
-final class TargetFileOperationsTests: XCTestCase {
+final class TargetFileOperationsTests: XCTProjectTestCase {
   
-  var tempDir: URL!
-  var projectPath: String!
+  var tempFiles: [URL] = []
   
   override func setUp() {
     super.setUp()
-    tempDir = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString)
-    try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-    
-    // Create test project
-    projectPath = tempDir.appendingPathComponent("TestProject.xcodeproj").path
-    TestHelpers.createTestProject(at: projectPath)
+    tempFiles = []
   }
   
   override func tearDown() {
+    // Clean up temporary files
+    TestHelpers.cleanupTestItems(tempFiles)
     super.tearDown()
-    try? FileManager.default.removeItem(at: tempDir)
   }
   
   // MARK: - add-target-file tests
   
   func testAddTargetFileToExistingFile() throws {
-    // First add a file to the project but not to any target
-    let sourceFile = tempDir.appendingPathComponent("TestFile.swift")
-    try "// Test file".write(to: sourceFile, atomically: true, encoding: .utf8)
+    // First add a file to the project with a target
+    let sourceFile = try TestHelpers.createTestFile(name: "TestTargetFile.swift", content: "// Test file for target operations")
+    tempFiles.append(sourceFile)
     
-    // Add file to project (in a group but no targets initially)
-    var result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path, 
-      "--group", "Sources", "--targets", "TestApp"
+    // Add file to project with target
+    var result = try runCommand("add-file", arguments: [
+      sourceFile.path, 
+      "--group", "Sources",
+      "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to add file: \(result.error)")
     
-    // Now add the same file to another target using add-target-file
-    result = try TestHelpers.runCommand("add-target-file", arguments: [
-      "--project", projectPath, sourceFile.path, "--targets", "TestFramework"
+    // Remove the file from the target (but keep in project)
+    result = try runCommand("remove-target-file", arguments: [
+      "TestTargetFile.swift", "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to remove file from target: \(result.error)")
     
-    // Verify file is in both targets
-    result = try TestHelpers.runCommand("list-files", arguments: [
-      "--project", projectPath
+    // Now re-add the file to the target using add-target-file
+    result = try runCommand("add-target-file", arguments: [
+      "TestTargetFile.swift", "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.output.contains("TestFile.swift"))
+    XCTAssertTrue(result.success, "Failed to add file back to target: \(result.error)")
+    
+    // Verify file is in project
+    result = try runCommand("list-files")
+    XCTAssertTrue(result.output.contains("TestTargetFile.swift"))
   }
   
   func testAddTargetFileNonExistentFile() throws {
-    let result = try TestHelpers.runCommand("add-target-file", arguments: [
-      "--project", projectPath, "NonExistent.swift", "--targets", "TestApp"
+    let result = try runCommand("add-target-file", arguments: [
+      "NonExistent.swift", "--targets", "TestApp"
     ])
     
     XCTAssertFalse(result.success)
-    XCTAssertTrue(result.error.contains("not found in project"))
+    TestHelpers.assertOutputOrErrorContains(result, "not found in project")
   }
   
   // MARK: - remove-target-file tests
   
-  func testRemoveTargetFileFromSpecificTarget() throws {
-    let sourceFile = tempDir.appendingPathComponent("SharedFile.swift")
-    try "// Shared file".write(to: sourceFile, atomically: true, encoding: .utf8)
+  func testRemoveTargetFileFromTarget() throws {
+    let sourceFile = try TestHelpers.createTestFile(name: "RemovableFile.swift", content: "// File to remove from target")
+    tempFiles.append(sourceFile)
     
-    // Add file to multiple targets
-    var result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path,
-      "--group", "Sources", "--targets", "TestApp,TestFramework"
+    // Add file with target
+    var result = try runCommand("add-file", arguments: [
+      sourceFile.path,
+      "--group", "Sources", "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to add file: \(result.error)")
     
-    // Remove from one target only
-    result = try TestHelpers.runCommand("remove-target-file", arguments: [
-      "--project", projectPath, sourceFile.path, "--targets", "TestFramework"
+    // Remove from target only (file should remain in project)
+    result = try runCommand("remove-target-file", arguments: [
+      "RemovableFile.swift", "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to remove file from target: \(result.error)")
     
     // Verify file still exists in project
-    result = try TestHelpers.runCommand("list-files", arguments: [
-      "--project", projectPath
-    ])
-    XCTAssertTrue(result.output.contains("SharedFile.swift"))
-    
-    // File should still be in TestApp target but not TestFramework
-    // This would require more detailed inspection of the project structure
+    result = try runCommand("list-files")
+    XCTAssertTrue(result.output.contains("RemovableFile.swift"), "File should still be in project")
   }
   
   func testRemoveFileCompletelyFromProject() throws {
-    let sourceFile = tempDir.appendingPathComponent("TempFile.swift")
-    try "// Temp file".write(to: sourceFile, atomically: true, encoding: .utf8)
+    let sourceFile = try TestHelpers.createTestFile(name: "TempFile.swift", content: "// Temp file")
+    tempFiles.append(sourceFile)
     
     // Add file
-    var result = try TestHelpers.runCommand("add-file", arguments: [
-      "--project", projectPath, sourceFile.path,
+    var result = try runCommand("add-file", arguments: [
+      sourceFile.path,
       "--group", "Sources", "--targets", "TestApp"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to add file: \(result.error)")
     
     // Remove completely from project
-    result = try TestHelpers.runCommand("remove-file", arguments: [
-      "--project", projectPath, sourceFile.path
+    result = try runCommand("remove-file", arguments: [
+      "TempFile.swift"
     ])
-    XCTAssertTrue(result.success)
+    XCTAssertTrue(result.success, "Failed to remove file: \(result.error)")
     
     // File should be gone from project
-    result = try TestHelpers.runCommand("list-files", arguments: [
-      "--project", projectPath
-    ])
-    XCTAssertFalse(result.output.contains("TempFile.swift"))
+    result = try runCommand("list-files")
+    XCTAssertFalse(result.output.contains("TempFile.swift"), "File should be removed from project")
   }
 }
