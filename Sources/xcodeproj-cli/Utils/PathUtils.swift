@@ -6,6 +6,7 @@
 //
 
 import Foundation
+@preconcurrency import XcodeProj
 
 /// Path manipulation and security utilities
 struct PathUtils {
@@ -54,5 +55,72 @@ struct PathUtils {
   static func isCompilableFile(_ path: String) -> Bool {
     let compilableExtensions = ["swift", "m", "mm", "cpp", "cc", "cxx", "c"]
     return compilableExtensions.contains((path as NSString).pathExtension.lowercased())
+  }
+  
+  /// Match a file reference against a search path with multiple strategies
+  /// Returns true if the file reference matches the search path
+  /// Supports: exact match, filename match, and partial path match
+  static func fileReferenceMatches(fileRef: PBXFileReference, searchPath: String) -> Bool {
+    // Strategy 1: Exact path or name match
+    if fileRef.path == searchPath || fileRef.name == searchPath {
+      return true
+    }
+    
+    // Strategy 2: Filename-only match (most specific)
+    let searchFileName = (searchPath as NSString).lastPathComponent
+    let refFileName = ((fileRef.path ?? fileRef.name ?? "") as NSString).lastPathComponent
+    
+    if !searchFileName.isEmpty && searchFileName == refFileName {
+      // For filename-only searches, prefer exact filename matches
+      return true
+    }
+    
+    // Strategy 3: Partial path match (must match path components exactly)
+    if let refPath = fileRef.path ?? fileRef.name {
+      // Split paths into components for precise matching
+      let searchComponents = searchPath.split(separator: "/").map(String.init)
+      let refComponents = refPath.split(separator: "/").map(String.init)
+      
+      // Check if search path components appear in order at the end of ref path
+      if searchComponents.count <= refComponents.count {
+        let startIndex = refComponents.count - searchComponents.count
+        let refSuffix = Array(refComponents[startIndex...])
+        if refSuffix == searchComponents {
+          return true
+        }
+      }
+    }
+    
+    return false
+  }
+  
+  /// Find the best matching file reference for a given search path
+  /// Returns the most specific match if multiple files match
+  static func findBestFileMatch(in fileRefs: [PBXFileReference], searchPath: String) -> PBXFileReference? {
+    let matches = fileRefs.filter { fileReferenceMatches(fileRef: $0, searchPath: searchPath) }
+    
+    // If no matches or single match, return immediately
+    if matches.count <= 1 {
+      return matches.first
+    }
+    
+    // Multiple matches - prefer more specific matches
+    // Priority: exact path > exact name > longer path > shorter path
+    let sorted = matches.sorted { ref1, ref2 in
+      // Exact path match takes highest priority
+      if ref1.path == searchPath { return true }
+      if ref2.path == searchPath { return false }
+      
+      // Exact name match is next priority  
+      if ref1.name == searchPath { return true }
+      if ref2.name == searchPath { return false }
+      
+      // Prefer longer paths (more specific)
+      let path1 = ref1.path ?? ref1.name ?? ""
+      let path2 = ref2.path ?? ref2.name ?? ""
+      return path1.count > path2.count
+    }
+    
+    return sorted.first
   }
 }
