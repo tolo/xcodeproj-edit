@@ -48,7 +48,10 @@ struct RemoveTargetFileCommand: Command {
         Remove a file from target build phases without removing it from the project
         
         Arguments:
-          <file-path>           Path to the file
+          <file-path>           Path to the file in the project
+                                Can be: filename only (Model.swift),
+                                partial path (Sources/Model.swift),
+                                or full project path
           --targets, -t <list>  Comma-separated list of target names
         
         Examples:

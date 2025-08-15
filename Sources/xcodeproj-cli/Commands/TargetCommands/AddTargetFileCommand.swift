@@ -49,6 +49,9 @@ struct AddTargetFileCommand: Command {
         
         Arguments:
           <file-path>           Path to the file (must already exist in project)
+                                Can be: filename only (Model.swift),
+                                partial path (Sources/Model.swift),
+                                or full project path
           --targets, -t <list>  Comma-separated list of target names
         
         Examples:

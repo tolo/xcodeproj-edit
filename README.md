@@ -504,6 +504,9 @@ done
 | `remove-group` | Remove any group/folder type | `remove-group OldGroup` |
 
 ### 📁 File & Folder Management
+
+> **Note**: File paths can be specified as: filename only (`Model.swift`), partial path (`Sources/Model.swift`), or full project path
+
 | Command | Description | Example |
 |---------|-------------|---------|
 | `add-file` | Add single file | `add-file Path/File.swift --group GroupName --targets Target1,Target2` |
@@ -513,8 +516,8 @@ done
 | `move-file` | Move or rename file | `move-file old/path new/path` |
 | `remove-file` | Remove file from project | `remove-file Path/File.swift` |
 | `remove-folder` | (Deprecated - use `remove-group`) | `remove-group Path/Folder` |
-| `add-target-file` | Add existing file to targets | `add-target-file Path/File.swift --targets Target1,Target2` |
-| `remove-target-file` | Remove file from targets only | `remove-target-file Path/File.swift --targets Target1,Target2` |
+| `add-target-file` | Add existing file to targets | `add-target-file File.swift --targets Target1,Target2` |
+| `remove-target-file` | Remove file from targets only | `remove-target-file File.swift --targets Target1,Target2` |
 
 ### 🎯 Target Operations
 | Command | Description | Example |
