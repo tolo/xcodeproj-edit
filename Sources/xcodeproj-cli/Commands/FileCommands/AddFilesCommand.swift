@@ -27,10 +27,10 @@ struct AddFilesCommand: Command {
       error: "add-files requires --targets or -t flag"
     )
 
-    let targets = parseTargets(from: targetsStr)
+    let targets = BaseCommand.parseTargets(from: targetsStr)
 
     // Validate targets exist
-    try validateTargets(targets, in: utility)
+    try BaseCommand.validateTargets(targets, in: utility)
 
     // Check if we have file:group pairs or files with shared group
     var files: [(String, String)] = []
@@ -58,7 +58,7 @@ struct AddFilesCommand: Command {
       )
 
       // Validate group exists
-      try validateGroup(group, in: utility)
+      try BaseCommand.validateGroup(group, in: utility)
 
       // Create file:group pairs for all files
       for filePath in arguments.positional {
@@ -69,7 +69,7 @@ struct AddFilesCommand: Command {
     // Validate groups exist (for colon format)
     if hasColonFormat {
       for (_, group) in files {
-        try validateGroup(group, in: utility)
+        try BaseCommand.validateGroup(group, in: utility)
       }
     }
 
@@ -100,23 +100,5 @@ struct AddFilesCommand: Command {
           - Groups must exist before adding files
           - Cannot mix colon format with --group flag
       """)
-  }
-}
-
-// MARK: - BaseCommand conformance
-extension AddFilesCommand {
-  private static func parseTargets(from targetsString: String) -> [String] {
-    return BaseCommand.parseTargets(from: targetsString)
-  }
-
-  @MainActor
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
-  {
-    try BaseCommand.validateTargets(targetNames, in: utility)
-  }
-
-  @MainActor
-  private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
-    try BaseCommand.validateGroup(groupPath, in: utility)
   }
 }

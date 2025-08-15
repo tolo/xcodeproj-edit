@@ -10,16 +10,17 @@ import XCTest
 
 final class TargetFileOperationsTests: XCTProjectTestCase {
   
-  var tempFiles: [URL] = []
+  var createdTestFiles: [URL] = []
   
   override func setUp() {
     super.setUp()
-    tempFiles = []
+    createdTestFiles = []
   }
   
   override func tearDown() {
     // Clean up temporary files
-    TestHelpers.cleanupTestItems(tempFiles)
+    TestHelpers.cleanupTestItems(createdTestFiles)
+    createdTestFiles.removeAll()
     super.tearDown()
   }
   
@@ -28,7 +29,7 @@ final class TargetFileOperationsTests: XCTProjectTestCase {
   func testAddTargetFileToExistingFile() throws {
     // First add a file to the project with a target
     let sourceFile = try TestHelpers.createTestFile(name: "TestTargetFile.swift", content: "// Test file for target operations")
-    tempFiles.append(sourceFile)
+    createdTestFiles.append(sourceFile)
     
     // Add file to project with target
     var result = try runCommand("add-file", arguments: [
@@ -68,7 +69,7 @@ final class TargetFileOperationsTests: XCTProjectTestCase {
   
   func testRemoveTargetFileFromTarget() throws {
     let sourceFile = try TestHelpers.createTestFile(name: "RemovableFile.swift", content: "// File to remove from target")
-    tempFiles.append(sourceFile)
+    createdTestFiles.append(sourceFile)
     
     // Add file with target
     var result = try runCommand("add-file", arguments: [
@@ -90,7 +91,7 @@ final class TargetFileOperationsTests: XCTProjectTestCase {
   
   func testRemoveFileCompletelyFromProject() throws {
     let sourceFile = try TestHelpers.createTestFile(name: "TempFile.swift", content: "// Temp file")
-    tempFiles.append(sourceFile)
+    createdTestFiles.append(sourceFile)
     
     // Add file
     var result = try runCommand("add-file", arguments: [
@@ -108,5 +109,59 @@ final class TargetFileOperationsTests: XCTProjectTestCase {
     // File should be gone from project
     result = try runCommand("list-files")
     XCTAssertFalse(result.output.contains("TempFile.swift"), "File should be removed from project")
+  }
+  
+  // MARK: - Error Scenario Tests
+  
+  func testAddTargetFileWithNonExistentFile() throws {
+    // Try to add a non-existent file to target
+    let result = try runCommand("add-target-file", arguments: [
+      "NonExistent.swift",
+      "--targets", "TestApp"
+    ])
+    
+    TestHelpers.assertCommandFailure(result)
+    TestHelpers.assertOutputOrErrorContains(result, "not found")
+  }
+  
+  func testAddTargetFileWithNonExistentTarget() throws {
+    // First create a test file and add it to the project
+    let testFile = try TestHelpers.createTestFile(name: "ErrorTest.swift", content: "class ErrorTest {}")
+    createdTestFiles.append(testFile)
+    
+    _ = try runSuccessfulCommand("add-file", arguments: [
+      testFile.path,
+      "--group", "Sources",
+      "--targets", "TestApp"
+    ])
+    
+    // Try to add it to a non-existent target
+    let result = try runCommand("add-target-file", arguments: [
+      "ErrorTest.swift",  // Use just the filename since it's now in the project
+      "--targets", "NonExistentTarget"
+    ])
+    
+    TestHelpers.assertCommandFailure(result)
+    TestHelpers.assertOutputOrErrorContains(result, "Target not found")
+  }
+  
+  func testAddTargetFileWithoutTargetFlag() throws {
+    // Try to add file without specifying target
+    let result = try runCommand("add-target-file", arguments: [
+      "SomeFile.swift"
+    ])
+    
+    TestHelpers.assertCommandFailure(result)
+    TestHelpers.assertOutputOrErrorContains(result, "Missing required --targets or --target")
+  }
+  
+  func testRemoveTargetFileWithoutTargetFlag() throws {
+    // Try to remove file without specifying target
+    let result = try runCommand("remove-target-file", arguments: [
+      "SomeFile.swift"
+    ])
+    
+    TestHelpers.assertCommandFailure(result)
+    TestHelpers.assertOutputOrErrorContains(result, "Missing required --targets or --target")
   }
 }

@@ -1169,20 +1169,9 @@ class XcodeProjUtility {
   // MARK: - Target-Only File Operations
 
   func addFileToTarget(path: String, targetName: String) throws {
-    // Find the file reference - it must already exist in the project
-    let fileName = (path as NSString).lastPathComponent
-
+    // Find the file reference using improved matching logic
     guard
-      let fileRef = pbxproj.fileReferences.first(where: {
-        // Check exact path match
-        $0.path == path
-          // Check name match
-          || $0.name == path
-          // Check filename match (just the last component)
-          || $0.path == fileName || $0.name == fileName
-          // Check if the path ends with the provided path (for partial paths like "Sources/File.swift")
-          || ($0.path?.hasSuffix(path) ?? false)
-      })
+      let fileRef = PathUtils.findBestFileMatch(in: Array(pbxproj.fileReferences), searchPath: path)
     else {
       throw ProjectError.operationFailed(
         "File not found in project: \(path). File must already exist in the project to add to targets."
@@ -1196,16 +1185,18 @@ class XcodeProjUtility {
       isCompilable: isCompilableFile(path)
     )
 
+    let fileName = fileRef.path ?? fileRef.name ?? path
     print("✅ Added \(fileName) to target: \(targetName)")
   }
 
   func removeFileFromTarget(path: String, targetName: String) throws {
     // Find the file reference using improved matching logic
-    guard let fileRef = PathUtils.findBestFileMatch(in: Array(pbxproj.fileReferences), searchPath: path)
+    guard
+      let fileRef = PathUtils.findBestFileMatch(in: Array(pbxproj.fileReferences), searchPath: path)
     else {
       throw ProjectError.operationFailed("File not found in project: \(path)")
     }
-    
+
     let fileName = (path as NSString).lastPathComponent
 
     guard let target = pbxproj.nativeTargets.first(where: { $0.name == targetName }) else {

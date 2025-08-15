@@ -17,7 +17,7 @@ struct AddFileCommand: Command {
 
   static func execute(with arguments: ParsedArguments, utility: XcodeProjUtility) throws {
     // Validate required arguments
-    try requirePositionalArguments(
+    try BaseCommand.requirePositionalArguments(
       arguments,
       count: 1,
       usage: "add-file requires: <file-path> --group <group> --targets <target1,target2>"
@@ -36,11 +36,11 @@ struct AddFileCommand: Command {
       error: "add-file requires --targets or -t flag"
     )
 
-    let targets = parseTargets(from: targetsStr)
+    let targets = BaseCommand.parseTargets(from: targetsStr)
 
     // Validate inputs
-    try validateGroup(group, in: utility)
-    try validateTargets(targets, in: utility)
+    try BaseCommand.validateGroup(group, in: utility)
+    try BaseCommand.validateTargets(targets, in: utility)
 
     // Execute the command
     try utility.addFile(path: filePath, to: group, targets: targets)
@@ -61,29 +61,5 @@ struct AddFileCommand: Command {
           add-file Sources/Model.swift --group Models --targets MyApp,MyAppTests
           add-file Helper.swift -g Utils -t MyApp
       """)
-  }
-}
-
-// MARK: - BaseCommand conformance
-extension AddFileCommand {
-  private static func requirePositionalArguments(
-    _ arguments: ParsedArguments, count: Int, usage: String
-  ) throws {
-    try BaseCommand.requirePositionalArguments(arguments, count: count, usage: usage)
-  }
-
-  private static func parseTargets(from targetsString: String) -> [String] {
-    return BaseCommand.parseTargets(from: targetsString)
-  }
-
-  @MainActor
-  private static func validateTargets(_ targetNames: [String], in utility: XcodeProjUtility) throws
-  {
-    try BaseCommand.validateTargets(targetNames, in: utility)
-  }
-
-  @MainActor
-  private static func validateGroup(_ groupPath: String, in utility: XcodeProjUtility) throws {
-    try BaseCommand.validateGroup(groupPath, in: utility)
   }
 }
