@@ -19,14 +19,18 @@ class BuildPhaseManager {
   // MARK: - Build File Collection
 
   /// Finds all build files that reference the given file reference
-  func findBuildFiles(for fileReference: PBXFileReference) -> Set<PBXBuildFile> {
-    var buildFiles: Set<PBXBuildFile> = []
+  /// Returns an array to avoid Set crashes with duplicate PBXBuildFile elements (XcodeProj 9.4.3 bug)
+  func findBuildFiles(for fileReference: PBXFileReference) -> [PBXBuildFile] {
+    var buildFiles: [PBXBuildFile] = []
 
     for target in pbxproj.nativeTargets {
       for buildPhase in target.buildPhases {
         let phaseFiles = getBuildPhaseFiles(buildPhase)
         for buildFile in phaseFiles where buildFile.file === fileReference {
-          buildFiles.insert(buildFile)
+          // Use identity comparison to avoid duplicates
+          if !buildFiles.contains(where: { $0 === buildFile }) {
+            buildFiles.append(buildFile)
+          }
         }
       }
     }
