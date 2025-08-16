@@ -389,6 +389,15 @@ class XcodeProjUtility {
     throw ProjectError.groupNotFound(groupPath)
   }
 
+  // MARK: - Utility Methods
+
+  /// Adds an item to an array only if it's not already present (using identity comparison)
+  private func addUniqueByIdentity<T: AnyObject>(_ item: T, to array: inout [T]) {
+    if !array.contains(where: { $0 === item }) {
+      array.append(item)
+    }
+  }
+
   // MARK: - Group Removal Helper Methods
 
   /// Contains collected contents from a group hierarchy
@@ -436,12 +445,16 @@ class XcodeProjUtility {
   private func removeFilesFromBuildPhases(_ files: [PBXFileReference]) {
     // Collect all build files that need to be removed
     // Using Array instead of Set to avoid crashes with duplicate PBXBuildFile elements (XcodeProj 9.4.3 bug)
+    // Uses ObjectIdentifier for O(1) duplicate detection performance
     var buildFilesToDelete: [PBXBuildFile] = []
+    var seen = Set<ObjectIdentifier>()
+
     for fileRef in files {
       let foundBuildFiles = buildPhaseManager.findBuildFiles(for: fileRef)
       for buildFile in foundBuildFiles {
-        // Use identity comparison to avoid duplicates
-        if !buildFilesToDelete.contains(where: { $0 === buildFile }) {
+        let id = ObjectIdentifier(buildFile)
+        if !seen.contains(id) {
+          seen.insert(id)
           buildFilesToDelete.append(buildFile)
         }
       }
