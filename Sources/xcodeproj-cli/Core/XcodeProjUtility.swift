@@ -508,7 +508,10 @@ class XcodeProjUtility {
     }
 
     // Remove build files from build phases
-    buildPhaseManager.removeBuildFiles { buildFilesToDelete.contains($0) }
+    // Use identity comparison to match the fix pattern and avoid Set crashes
+    buildPhaseManager.removeBuildFiles { buildFile in
+      buildFilesToDelete.contains(where: { $0 === buildFile })
+    }
 
     // Delete all collected build files from the project
     for buildFile in buildFilesToDelete {

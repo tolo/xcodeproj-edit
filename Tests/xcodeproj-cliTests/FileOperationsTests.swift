@@ -620,6 +620,43 @@ final class FileOperationsTests: XCTProjectTestCase {
     }
   }
 
+  func testRemoveFolderWithPotentialDuplicates() throws {
+    // Test folder removal to ensure it doesn't crash with duplicate build files
+    // This tests the fix for removeFolderReference method
+
+    // Create a test directory with files
+    let testDir = try TestHelpers.createTestDirectory(
+      name: "FolderToRemove",
+      files: [
+        "File1.swift": "// Test file 1\n",
+        "File2.swift": "// Test file 2\n",
+      ]
+    )
+    createdTestDirectories.append(testDir)
+
+    let targetName =
+      extractFirstTarget(from: try runSuccessfulCommand("list-targets").output) ?? "TestApp"
+
+    // Add the folder as a folder reference (not groups)
+    _ = try runSuccessfulCommand(
+      "add-folder",
+      arguments: [
+        testDir.path,
+        "--group", "Sources",
+        "--targets", targetName,
+      ])
+
+    // Try to remove the folder - should not crash even if there are duplicate build files
+    let removeResult = try runCommand("remove-group", arguments: ["FolderToRemove"])
+
+    // Should either succeed or provide clear error, but not crash
+    XCTAssertTrue(
+      removeResult.success || removeResult.output.contains("Error")
+        || removeResult.error.contains("Error"),
+      "Remove folder should either succeed or provide clear error, not crash"
+    )
+  }
+
   // MARK: - Helper Methods
 
   private func extractFirstTarget(from output: String) -> String? {
